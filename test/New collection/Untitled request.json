@@ -1,0 +1,21 @@
+{
+  "name": "Untitled request",
+  "rank": "auntit17772311914131",
+  "request": {
+    "type": "http",
+    "url": "https://app.requestly.io/echo",
+    "scripts": {
+      "preRequest": "",
+      "postResponse": ""
+    },
+    "method": "GET",
+    "queryParams": [],
+    "headers": [],
+    "body": "",
+    "contentType": "text/plain",
+    "auth": {
+      "currentAuthType": "INHERIT",
+      "authConfigStore": {}
+    }
+  }
+}
