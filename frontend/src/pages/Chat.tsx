@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Send, ArrowRight } from 'lucide-react';
 import { MessageBubble, type Message } from '../components/MessageBubble';
 import { getSSEEndpoint, fetchAPI } from '../utils/api';
@@ -9,7 +9,6 @@ import './Chat.css';
 export const Chat: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const chatId = searchParams.get('chat');
-  const navigate = useNavigate();
   const { user } = useAuth();
   
   const [query, setQuery] = useState('');
@@ -65,7 +64,7 @@ export const Chat: React.FC = () => {
         });
         if (res && res.length > 0) {
           activeChatId = res[0].id;
-          setSearchParams({ chat: activeChatId });
+          setSearchParams({ chat: res[0].id });
         }
       } catch (err) {
         console.error('Failed to create new chat', err);
@@ -78,7 +77,6 @@ export const Chat: React.FC = () => {
     setQuery('');
     setIsLoading(true);
 
-    const aiMessageIndex = messages.length + 1; // It will be next after the user message
     setMessages(prev => [...prev, { role: 'assistant', content: '', isStreaming: true }]);
 
     try {
@@ -124,27 +122,35 @@ export const Chat: React.FC = () => {
                   sources = data;
                   setMessages(prev => {
                     const newMsgs = [...prev];
-                    newMsgs[aiMessageIndex] = { ...newMsgs[aiMessageIndex], sources };
+                    if (newMsgs.length > 0) {
+                      newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], sources };
+                    }
                     return newMsgs;
                   });
                 } else if (eventType === 'text') {
                   aiContent += data.delta;
                   setMessages(prev => {
                     const newMsgs = [...prev];
-                    newMsgs[aiMessageIndex] = { ...newMsgs[aiMessageIndex], content: aiContent };
+                    if (newMsgs.length > 0) {
+                      newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], content: aiContent };
+                    }
                     return newMsgs;
                   });
                 } else if (eventType === 'followUps') {
                   followUps = data;
                   setMessages(prev => {
                     const newMsgs = [...prev];
-                    newMsgs[aiMessageIndex] = { ...newMsgs[aiMessageIndex], followUps };
+                    if (newMsgs.length > 0) {
+                      newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], followUps };
+                    }
                     return newMsgs;
                   });
                 } else if (eventType === 'end') {
                   setMessages(prev => {
                     const newMsgs = [...prev];
-                    newMsgs[aiMessageIndex] = { ...newMsgs[aiMessageIndex], isStreaming: false };
+                    if (newMsgs.length > 0) {
+                      newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], isStreaming: false };
+                    }
                     return newMsgs;
                   });
                   setIsLoading(false);
@@ -161,11 +167,13 @@ export const Chat: React.FC = () => {
       console.error("Chat error:", error);
       setMessages(prev => {
         const newMsgs = [...prev];
-        newMsgs[aiMessageIndex] = { 
-          role: 'assistant', 
-          content: 'An error occurred while fetching the response.', 
-          isStreaming: false 
-        };
+        if (newMsgs.length > 0) {
+          newMsgs[newMsgs.length - 1] = { 
+            role: 'assistant', 
+            content: 'An error occurred while fetching the response.', 
+            isStreaming: false 
+          };
+        }
         return newMsgs;
       });
       setIsLoading(false);
