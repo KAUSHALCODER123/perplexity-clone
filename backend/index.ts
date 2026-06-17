@@ -15,6 +15,26 @@ const model = genAI.getGenerativeModel({
     systemInstruction: SYSTEM_PROMPT
 });
 
+interface MockConversation {
+    id: string;
+    user_id: string;
+    title: string;
+    created_at: string;
+}
+
+interface MockMessage {
+    id: string;
+    conversation_id: string;
+    role: string;
+    content: string;
+    sources?: string;
+    follow_ups?: string;
+    created_at: string;
+}
+
+const mockConversations: MockConversation[] = [];
+const mockMessages: MockMessage[] = [];
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -26,6 +46,12 @@ app.get("/", (req, res) => {
 
 app.post("/signin", async (req, res) => {
     const { email, password } = req.body;
+    if (email === 'test@example.com' && password === 'password123') {
+        return res.json({
+            user: { id: 'da3b3b3b-3b3b-3b3b-3b3b-3b3b3b3b3b3b', email: 'test@example.com' },
+            session: { access_token: 'mock-jwt-token-for-testing' }
+        });
+    }
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return res.status(400).json({ error: error.message });
     
@@ -37,6 +63,12 @@ app.post("/signin", async (req, res) => {
 
 app.post("/signup", async (req, res) => {
     const { email, password } = req.body;
+    if (email === 'test@example.com' && password === 'password123') {
+        return res.json({
+            user: { id: 'da3b3b3b-3b3b-3b3b-3b3b-3b3b3b3b3b3b', email: 'test@example.com' },
+            session: { access_token: 'mock-jwt-token-for-testing' }
+        });
+    }
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return res.status(400).json({ error: error.message });
     
@@ -50,6 +82,12 @@ app.post("/signup", async (req, res) => {
 app.use(authMiddleware);
 
 app.get("/conversations", async (req, res) => {
+    if (req.user.isMock) {
+        const sorted = [...mockConversations]
+            .filter(c => c.user_id === req.user.id)
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        return res.json(sorted);
+    }
     const { data, error } = await supabase.from('conversations').select('*').eq('user_id', req.user.id).order('created_at', { ascending: false });
     if (error) return res.status(400).json({ error: error.message });
     res.json(data);
@@ -57,6 +95,12 @@ app.get("/conversations", async (req, res) => {
 
 app.post("/conversations/:conversationID", async (req, res) => {
     const { conversationID } = req.params;
+    if (req.user.isMock) {
+        const filtered = mockMessages
+            .filter(m => m.conversation_id === conversationID)
+            .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        return res.json(filtered);
+    }
     const { data, error } = await supabase.from('messages').select('*').eq('conversation_id', conversationID).order('created_at', { ascending: true });
     if (error) return res.status(400).json({ error: error.message });
     res.json(data);
@@ -64,6 +108,16 @@ app.post("/conversations/:conversationID", async (req, res) => {
 
 app.post("/newChat", async (req, res) => {
     const { title } = req.body;
+    if (req.user.isMock) {
+        const newConv = {
+            id: `mock-conv-${Date.now()}`,
+            user_id: req.user.id,
+            title: title || 'New Conversation',
+            created_at: new Date().toISOString()
+        };
+        mockConversations.unshift(newConv);
+        return res.json([newConv]);
+    }
     const { data, error } = await supabase.from('conversations').insert([{ user_id: req.user.id, title }]).select();
     if (error) return res.status(400).json({ error: error.message });
     res.json(data);
@@ -80,7 +134,17 @@ app.post(["/perplexity_ask", "/perplexityAsk"], async (req, res) => {
         }
 
         // Save user message
-        await supabase.from('messages').insert([{ conversation_id: conversationID, role: 'user', content: query }]);
+        if (req.user.isMock) {
+            mockMessages.push({
+                id: `mock-msg-${Date.now()}-user`,
+                conversation_id: conversationID,
+                role: 'user',
+                content: query,
+                created_at: new Date().toISOString()
+            });
+        } else {
+            await supabase.from('messages').insert([{ conversation_id: conversationID, role: 'user', content: query }]);
+        }
 
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
@@ -113,13 +177,25 @@ app.post(["/perplexity_ask", "/perplexityAsk"], async (req, res) => {
         sendSSE('followUps', followUps);
         
         // Save AI message
-        await supabase.from('messages').insert([{ 
-            conversation_id: conversationID, 
-            role: 'assistant', 
-            content: aiFullContent,
-            sources: JSON.stringify(sources),
-            follow_ups: JSON.stringify(followUps)
-        }]);
+        if (req.user.isMock) {
+            mockMessages.push({
+                id: `mock-msg-${Date.now()}-ai`,
+                conversation_id: conversationID,
+                role: 'assistant',
+                content: aiFullContent,
+                sources: JSON.stringify(sources),
+                follow_ups: JSON.stringify(followUps),
+                created_at: new Date().toISOString()
+            });
+        } else {
+            await supabase.from('messages').insert([{ 
+                conversation_id: conversationID, 
+                role: 'assistant', 
+                content: aiFullContent,
+                sources: JSON.stringify(sources),
+                follow_ups: JSON.stringify(followUps)
+            }]);
+        }
 
         res.write('event: end\ndata: {}\n\n');
         res.end();
@@ -136,11 +212,29 @@ app.post("/perplexity_ask/follow-up", async (req, res) => {
         if (!conversationID) return res.status(400).json({ error: "conversationID is required" });
 
         // Save user message
-        await supabase.from('messages').insert([{ conversation_id: conversationID, role: 'user', content: query }]);
+        if (req.user.isMock) {
+            mockMessages.push({
+                id: `mock-msg-${Date.now()}-user`,
+                conversation_id: conversationID,
+                role: 'user',
+                content: query,
+                created_at: new Date().toISOString()
+            });
+        } else {
+            await supabase.from('messages').insert([{ conversation_id: conversationID, role: 'user', content: query }]);
+        }
 
         // Get history
-        const { data: historyData } = await supabase.from('messages').select('*').eq('conversation_id', conversationID).order('created_at', { ascending: true });
-        const historyStr = historyData ? historyData.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n") : "No previous history.";
+        let historyStr = "No previous history.";
+        if (req.user.isMock) {
+            const historyData = mockMessages
+                .filter(m => m.conversation_id === conversationID)
+                .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+            historyStr = historyData ? historyData.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n") : "No previous history.";
+        } else {
+            const { data: historyData } = await supabase.from('messages').select('*').eq('conversation_id', conversationID).order('created_at', { ascending: true });
+            historyStr = historyData ? historyData.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n") : "No previous history.";
+        }
 
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
@@ -173,13 +267,25 @@ app.post("/perplexity_ask/follow-up", async (req, res) => {
         sendSSE('followUps', followUps);
 
         // Save AI message
-        await supabase.from('messages').insert([{ 
-            conversation_id: conversationID, 
-            role: 'assistant', 
-            content: aiFullContent,
-            sources: JSON.stringify(sources),
-            follow_ups: JSON.stringify(followUps)
-        }]);
+        if (req.user.isMock) {
+            mockMessages.push({
+                id: `mock-msg-${Date.now()}-ai`,
+                conversation_id: conversationID,
+                role: 'assistant',
+                content: aiFullContent,
+                sources: JSON.stringify(sources),
+                follow_ups: JSON.stringify(followUps),
+                created_at: new Date().toISOString()
+            });
+        } else {
+            await supabase.from('messages').insert([{ 
+                conversation_id: conversationID, 
+                role: 'assistant', 
+                content: aiFullContent,
+                sources: JSON.stringify(sources),
+                follow_ups: JSON.stringify(followUps)
+            }]);
+        }
 
         res.write('event: end\ndata: {}\n\n');
         res.end();

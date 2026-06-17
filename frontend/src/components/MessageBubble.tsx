@@ -30,7 +30,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onFollowU
       return <div className="user-text">{message.content}</div>;
     }
 
-    const htmlContent = marked.parse(message.content, { async: false }) as string;
+    const htmlContent = marked.parse(message.content || '', { async: false }) as string;
     const cleanContent = DOMPurify.sanitize(htmlContent);
 
     return (
