@@ -10,12 +10,33 @@ import type { Source } from '../components/MessageBubble';
  * "[1]" inside a code block or an href is left alone. Every element here is
  * built programmatically on top of already-sanitized markup.
  */
+/**
+ * Mid-stream, a half-arrived "**$142" shows its literal asterisks until the
+ * closing pair lands. Dropping the unmatched opener lets the text render plain
+ * and turn bold when it closes, instead of flashing raw markup.
+ */
+function healStreamingMarkdown(md: string): string {
+  // An unclosed fence means everything after it is code — close it and stop.
+  if (((md.match(/^```/gm) || []).length) % 2 === 1) return `${md}\n\`\`\``;
+
+  let out = md;
+  if (((out.match(/\*\*/g) || []).length) % 2 === 1) {
+    out = out.replace(/\*\*(?![\s\S]*\*\*)/, '');
+  }
+  if (((out.match(/`/g) || []).length) % 2 === 1) {
+    out = out.replace(/`(?![\s\S]*`)/, '');
+  }
+  return out;
+}
+
 export function renderAnswer(
   markdown: string,
   sources: Source[] | undefined,
-  domPrefix: string
+  domPrefix: string,
+  isStreaming = false
 ): string {
-  const html = marked.parse(markdown || '', { async: false, breaks: true }) as string;
+  const source = isStreaming ? healStreamingMarkdown(markdown || '') : markdown || '';
+  const html = marked.parse(source, { async: false, breaks: true }) as string;
   const clean = DOMPurify.sanitize(html);
 
   if (typeof window === 'undefined' || !window.DOMParser) return clean;

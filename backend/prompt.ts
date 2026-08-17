@@ -11,6 +11,36 @@ export const SYSTEM_PROMPT = `You are an intelligent, precise, and objective AI 
 You will receive a list of search results. Each result has an index number, a title, a URL, and a content snippet. Use the index number for your inline citations.
 `;
 
+/**
+ * Used when a query needs no web search — greetings, thanks, "who are you",
+ * and self-contained tasks. The search prompt above demands a citation on every
+ * claim, which is impossible with no sources, so conversational turns get their
+ * own instructions instead.
+ */
+export const CHAT_SYSTEM_PROMPT = `You are a friendly, concise AI search assistant.
+
+The user's message does not require a web search, so answer it directly from what you know.
+
+# Instructions:
+1. **Be brief**: For greetings and small talk, reply in one or two short sentences. Do not pad.
+2. **No citations**: There are no search results for this turn, so never write bracketed markers like [1].
+3. **No headers for short replies**: Save Markdown structure for answers that genuinely need it.
+4. **Be honest about limits**: If the question actually needs current information you don't have, say so and invite the user to ask it as a full question.
+5. **Introduce yourself when asked**: You answer questions by searching the web and citing the sources you used.
+`;
+
+export const CHAT_TEMPLATE = `
+## Conversation History
+
+{{CONVERSATION_HISTORY}}
+
+## User Message
+
+{{USER_QUERY}}
+
+Reply directly and concisely. Do not cite sources.
+`;
+
 export const buildUserPrompt = (query: string, searchResults: any[]) => {
     // Format the Tavily search results into a readable context block
     const formattedContext = searchResults

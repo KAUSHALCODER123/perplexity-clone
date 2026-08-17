@@ -15,6 +15,8 @@ export interface Message {
   sources?: Source[];
   followUps?: string[];
   isStreaming?: boolean;
+  /** 'direct' when the server answered without a web search. */
+  mode?: 'direct' | 'search';
 }
 
 interface MessageBubbleProps {
@@ -33,9 +35,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const html = useMemo(
     () =>
       message.role === 'assistant'
-        ? renderAnswer(message.content, message.sources, domPrefix)
+        ? renderAnswer(message.content, message.sources, domPrefix, message.isStreaming)
         : '',
-    [message.content, message.sources, message.role, domPrefix]
+    [message.content, message.sources, message.role, domPrefix, message.isStreaming]
   );
 
   if (message.role === 'user') {
@@ -82,7 +84,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         </section>
       )}
 
-      <div className="section-label">Answer</div>
+      {/* A one-line reply to "hi" doesn't need a section heading over it. */}
+      {message.mode !== 'direct' && <div className="section-label">Answer</div>}
 
       {!hasText && message.isStreaming ? (
         <p className="working" role="status">
@@ -91,9 +94,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             <i />
             <i />
           </span>
-          {sources.length > 0
-            ? `Reading ${sources.length} sources`
-            : 'Searching the web'}
+          {message.mode === 'direct'
+            ? 'Thinking'
+            : sources.length > 0
+              ? `Reading ${sources.length} sources`
+              : 'Searching the web'}
         </p>
       ) : (
         <div

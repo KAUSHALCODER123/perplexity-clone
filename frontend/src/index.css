@@ -372,7 +372,9 @@ textarea {
   min-width: 1.35em;
   height: 1.35em;
   padding: 0 0.32em;
-  margin: 0 0.12em;
+  /* Left margin only. A right margin pushes the following punctuation away,
+     rendering "suggest [1]." as "suggest 1 ." */
+  margin-left: 0.15em;
   vertical-align: 0.28em;
 
   font-family: var(--font-mono);

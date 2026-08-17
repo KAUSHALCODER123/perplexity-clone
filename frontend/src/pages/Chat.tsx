@@ -190,7 +190,10 @@ export const Chat: React.FC = () => {
           return; // a frame we can't read is a frame we skip
         }
 
-        if (event === 'sources' && Array.isArray(data)) {
+        if (event === 'mode') {
+          const mode = (data as { mode?: string })?.mode;
+          if (mode === 'direct' || mode === 'search') updateLast({ mode });
+        } else if (event === 'sources' && Array.isArray(data)) {
           updateLast({ sources: data as Source[] });
         } else if (event === 'text') {
           const delta = (data as { delta?: string })?.delta;

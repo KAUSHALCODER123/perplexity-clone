@@ -5,7 +5,7 @@ import z from "zod";
 import { tavily } from '@tavily/core';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { supabase } from "./supabaseClient.ts";
-import { PromptTemplate, SYSTEM_PROMPT } from "./prompt.ts";
+import { PromptTemplate, SYSTEM_PROMPT, CHAT_SYSTEM_PROMPT, CHAT_TEMPLATE } from "./prompt.ts";
 import { authMiddleware } from "./middleware.ts";
 
 const client = tavily({ apiKey: process.env.TAVILY_API_KEY! });
@@ -13,6 +13,13 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
     systemInstruction: SYSTEM_PROMPT
+});
+
+// The search prompt requires a citation on every claim, which is impossible
+// when there are no sources. Conversational turns use their own instructions.
+const chatModel = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    systemInstruction: CHAT_SYSTEM_PROMPT
 });
 
 interface MockConversation {
@@ -44,7 +51,9 @@ const mockMessages: MockMessage[] = [];
 async function generateFollowUps(query: string, answer: string): Promise<string[]> {
     if (!answer.trim()) return [];
     try {
-        const result = await model.generateContent(
+        // chatModel, not model: the search system prompt would try to add
+        // citations to what has to come back as a bare JSON array.
+        const result = await chatModel.generateContent(
             `A user asked: "${query}"\n\nThey received this answer:\n${answer.slice(0, 4000)}\n\n` +
             `Write 3 short follow-up questions they would plausibly ask next. ` +
             `Each must be a standalone question under 12 words. ` +
@@ -150,7 +159,37 @@ app.post("/newChat", async (req, res) => {
     res.json(data);
 });
 
-app.post(["/perplexity_ask", "/perplexityAsk"], async (req, res) => {
+/**
+ * Not every message deserves a web search. "hi", "thanks", "who are you" and
+ * self-contained tasks were all being sent to Tavily, which cost a search call
+ * and several seconds before the model could say "Hello". These go straight to
+ * the model instead.
+ *
+ * The test is deliberately a cheap pattern match rather than a classifier call:
+ * an extra LLM round trip to decide whether to search would add latency to
+ * every real question, which is the case that matters most.
+ */
+const SMALL_TALK = /^\s*(hi+|hey+|hello+|hii+|yo|sup|hola|namaste|greetings|good\s*(morning|afternoon|evening|night)|how(?:'?s)?\s+(are\s+(you|u)|is\s+it\s+going|it\s+going|are\s+things|things)|what'?s\s+up|wassup|thanks?|thank\s+you|thx|ty|cheers|ok(ay)?|k|cool|nice|great|awesome|perfect|got\s+it|lol|haha|bye|goodbye|see\s+(ya|you)|test(ing)?|ping|who\s+(are|r)\s+(you|u)|what\s+(are|r)\s+(you|u)|what\s+(can|do)\s+you\s+do|how\s+do\s+you\s+work|help)\s*[!.?,]*\s*$/i;
+
+/** Tasks the model performs on the text it was given — no outside facts needed. */
+const SELF_CONTAINED_TASK = /^\s*(write|compose|draft|rewrite|re-?write|rephrase|paraphrase|translate|summari[sz]e|shorten|expand|correct|proofread|fix|refactor|debug|explain\s+this\s+code|convert|calculate|compute|solve)\b/i;
+
+/** Bare arithmetic, e.g. "2+2" or "(15 * 3) / 4". */
+const ARITHMETIC = /^[\s\d+\-*/().,^%=]+$/;
+
+type Route = 'direct' | 'search';
+
+function routeQuery(query: string): Route {
+    const q = query.trim();
+    if (!q) return 'direct';
+    if (SMALL_TALK.test(q)) return 'direct';
+    if (ARITHMETIC.test(q)) return 'direct';
+    if (SELF_CONTAINED_TASK.test(q)) return 'direct';
+    return 'search';
+}
+
+/** Both ask endpoints do the same work; only the history differs. */
+async function handleAsk(req: any, res: any, opts: { withHistory: boolean }) {
     try {
         const { query, conversationID } = req.body;
         if (!query) {
@@ -173,99 +212,23 @@ app.post(["/perplexity_ask", "/perplexityAsk"], async (req, res) => {
             await supabase.from('messages').insert([{ conversation_id: conversationID, role: 'user', content: query }]);
         }
 
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        // Stops nginx and friends from buffering the stream into one blob.
-        res.setHeader('X-Accel-Buffering', 'no');
-        res.flushHeaders();
-
-        const sendSSE = (event: string, data: any) => {
-            // JSON.stringify never emits a raw newline, so each frame stays a
-            // single data line and the client's frame boundaries hold.
-            res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-        };
-
-        const webSearchResponse = await client.search(query, { searchDepth: "advanced" });
-        const results = webSearchResponse.results;
-        const sources = results.map(r => ({ title: r.title, url: r.url }));
-        sendSSE('sources', sources);
-
-        const promptText = PromptTemplate
-            .replace("{{CONVERSATION_HISTORY}}", "No previous history.")
-            .replace("{{WEB_SEARCH_RESULTS}}", results.map((r, i) => `Source [${i+1}]:\nTitle: ${r.title}\nURL: ${r.url}\nContent: ${r.content}`).join("\n\n"))
-            .replace("{{USER_QUERY}}", query);
-
-        const resultStream = await model.generateContentStream(promptText);
-
-        let aiFullContent = '';
-        for await (const chunk of resultStream.stream) {
-            const chunkText = chunk.text();
-            aiFullContent += chunkText;
-            sendSSE('text', { delta: chunkText });
-        }
-
-        const followUps = await generateFollowUps(query, aiFullContent);
-        sendSSE('followUps', followUps);
-        
-        // Save AI message
-        if (req.user.isMock) {
-            mockMessages.push({
-                id: `mock-msg-${Date.now()}-ai`,
-                conversation_id: conversationID,
-                role: 'assistant',
-                content: aiFullContent,
-                sources: JSON.stringify(sources),
-                follow_ups: JSON.stringify(followUps),
-                created_at: new Date().toISOString()
-            });
-        } else {
-            await supabase.from('messages').insert([{ 
-                conversation_id: conversationID, 
-                role: 'assistant', 
-                content: aiFullContent,
-                sources: JSON.stringify(sources),
-                follow_ups: JSON.stringify(followUps)
-            }]);
-        }
-
-        res.write('event: end\ndata: {}\n\n');
-        res.end();
-    } catch (error: any) {
-        if (!res.headersSent) res.status(500).json({ error: "Internal Server Error", details: error.message });
-        else { res.write(`event: error\ndata: ${JSON.stringify({ message: error.message })}\n\n`); res.end(); }
-    }
-});
-
-app.post("/perplexity_ask/follow-up", async (req, res) => {
-    try {
-        const { query, conversationID } = req.body;
-        if (!query) return res.status(400).json({ error: "Query is required" });
-        if (!conversationID) return res.status(400).json({ error: "conversationID is required" });
-
-        // Save user message
-        if (req.user.isMock) {
-            mockMessages.push({
-                id: `mock-msg-${Date.now()}-user`,
-                conversation_id: conversationID,
-                role: 'user',
-                content: query,
-                created_at: new Date().toISOString()
-            });
-        } else {
-            await supabase.from('messages').insert([{ conversation_id: conversationID, role: 'user', content: query }]);
-        }
-
-        // Get history
+        // Build history. The user's own message was just saved, so drop the
+        // last row — it is the query being answered, not prior context.
         let historyStr = "No previous history.";
-        if (req.user.isMock) {
-            const historyData = mockMessages
-                .filter(m => m.conversation_id === conversationID)
-                .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-            historyStr = historyData ? historyData.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n") : "No previous history.";
-        } else {
-            const { data: historyData } = await supabase.from('messages').select('*').eq('conversation_id', conversationID).order('created_at', { ascending: true });
-            historyStr = historyData ? historyData.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n") : "No previous history.";
+        if (opts.withHistory) {
+            let historyData: MockMessage[] | any[] | null = null;
+            if (req.user.isMock) {
+                historyData = mockMessages
+                    .filter(m => m.conversation_id === conversationID)
+                    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+            } else {
+                const { data } = await supabase.from('messages').select('*').eq('conversation_id', conversationID).order('created_at', { ascending: true });
+                historyData = data;
+            }
+            const prior = (historyData || []).slice(0, -1);
+            if (prior.length) {
+                historyStr = prior.map(m => `${String(m.role).toUpperCase()}: ${m.content}`).join("\n\n");
+            }
         }
 
         res.setHeader('Content-Type', 'text/event-stream');
@@ -281,17 +244,36 @@ app.post("/perplexity_ask/follow-up", async (req, res) => {
             res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
         };
 
-        const webSearchResponse = await client.search(query, { searchDepth: "advanced" });
-        const results = webSearchResponse.results;
-        const sources = results.map(r => ({ title: r.title, url: r.url }));
-        sendSSE('sources', sources);
+        const route = routeQuery(query);
+        // Tells the client whether to say "Searching the web" or "Thinking".
+        sendSSE('mode', { mode: route });
 
-        const promptText = PromptTemplate
-            .replace("{{CONVERSATION_HISTORY}}", historyStr)
-            .replace("{{WEB_SEARCH_RESULTS}}", results.map((r, i) => `Source [${i+1}]:\nTitle: ${r.title}\nURL: ${r.url}\nContent: ${r.content}`).join("\n\n"))
-            .replace("{{USER_QUERY}}", query);
+        let sources: { title: string; url: string }[] = [];
+        let promptText: string;
+        let activeModel = model;
 
-        const resultStream = await model.generateContentStream(promptText);
+        if (route === 'search') {
+            const webSearchResponse = await client.search(query, { searchDepth: "advanced" });
+            const results = webSearchResponse.results;
+            sources = results.map(r => ({ title: r.title, url: r.url }));
+            sendSSE('sources', sources);
+
+            promptText = PromptTemplate
+                .replace("{{CONVERSATION_HISTORY}}", historyStr)
+                .replace("{{WEB_SEARCH_RESULTS}}", results.map((r, i) => `Source [${i + 1}]:\nTitle: ${r.title}\nURL: ${r.url}\nContent: ${r.content}`).join("\n\n"))
+                .replace("{{USER_QUERY}}", query);
+        } else {
+            // Still announce an empty source list so the client can clear any
+            // "Reading sources" state instead of waiting on a rail that never comes.
+            sendSSE('sources', sources);
+
+            promptText = CHAT_TEMPLATE
+                .replace("{{CONVERSATION_HISTORY}}", historyStr)
+                .replace("{{USER_QUERY}}", query);
+            activeModel = chatModel;
+        }
+
+        const resultStream = await activeModel.generateContentStream(promptText);
 
         let aiFullContent = '';
         for await (const chunk of resultStream.stream) {
@@ -300,7 +282,11 @@ app.post("/perplexity_ask/follow-up", async (req, res) => {
             sendSSE('text', { delta: chunkText });
         }
 
-        const followUps = await generateFollowUps(query, aiFullContent);
+        // Small talk doesn't warrant a "keep going" list, and generating one
+        // costs an extra model call for no benefit.
+        const followUps = route === 'search'
+            ? await generateFollowUps(query, aiFullContent)
+            : [];
         sendSSE('followUps', followUps);
 
         // Save AI message
@@ -315,9 +301,9 @@ app.post("/perplexity_ask/follow-up", async (req, res) => {
                 created_at: new Date().toISOString()
             });
         } else {
-            await supabase.from('messages').insert([{ 
-                conversation_id: conversationID, 
-                role: 'assistant', 
+            await supabase.from('messages').insert([{
+                conversation_id: conversationID,
+                role: 'assistant',
                 content: aiFullContent,
                 sources: JSON.stringify(sources),
                 follow_ups: JSON.stringify(followUps)
@@ -327,10 +313,15 @@ app.post("/perplexity_ask/follow-up", async (req, res) => {
         res.write('event: end\ndata: {}\n\n');
         res.end();
     } catch (error: any) {
+        console.error('Ask failed', error);
         if (!res.headersSent) res.status(500).json({ error: "Internal Server Error", details: error.message });
         else { res.write(`event: error\ndata: ${JSON.stringify({ message: error.message })}\n\n`); res.end(); }
     }
-});
+}
+
+app.post(["/perplexity_ask", "/perplexityAsk"], (req, res) => handleAsk(req, res, { withHistory: false }));
+
+app.post("/perplexity_ask/follow-up", (req, res) => handleAsk(req, res, { withHistory: true }));
 
 const PORT = 5000;
 app.listen(PORT, () => {
