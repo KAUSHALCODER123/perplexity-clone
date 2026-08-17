@@ -14,6 +14,7 @@ export const Login: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
     setLoading(true);
 
@@ -22,15 +23,15 @@ export const Login: React.FC = () => {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
-      
-      if (data.user && data.session) {
+
+      if (data?.user && data?.session?.access_token) {
         login({ ...data.user, session: data.session });
-        navigate('/');
+        navigate('/', { replace: true });
       } else {
-        throw new Error('Invalid login response');
+        setError('That email and password did not match an account.');
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during login');
+    } catch (err) {
+      setError((err as Error)?.message || 'Could not reach the server.');
     } finally {
       setLoading(false);
     }
@@ -38,40 +39,57 @@ export const Login: React.FC = () => {
 
   return (
     <div className="auth-container">
-      <div className="glass-panel auth-card animate-fade-in">
-        <h2>Welcome Back</h2>
-        <p className="auth-subtitle">Sign in to continue your conversations</p>
-        
-        {error && <div className="auth-error">{error}</div>}
-        
+      <div className="auth-card animate-rise">
+        <div className="auth-brand">
+          <span className="brand-mark" aria-hidden="true">
+            §
+          </span>
+          <span>Cited</span>
+        </div>
+
+        <h1>Welcome back</h1>
+        <p className="auth-subtitle">Sign in to pick up your threads.</p>
+
+        {error && (
+          <div className="auth-notice error" role="alert">
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
-            <label>Email</label>
+            <label htmlFor="login-email">Email</label>
             <input
+              id="login-email"
               type="email"
-              className="input-field"
+              className="field"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
               required
             />
           </div>
+
           <div className="form-group">
-            <label>Password</label>
+            <label htmlFor="login-password">Password</label>
             <input
+              id="login-password"
               type="password"
-              className="input-field"
+              className="field"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
               required
             />
           </div>
+
           <button type="submit" className="btn-primary auth-submit" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-        
+
         <p className="auth-footer">
-          Don't have an account? <Link to="/signup">Sign up</Link>
+          No account yet? <Link to="/signup">Create one</Link>
         </p>
       </div>
     </div>

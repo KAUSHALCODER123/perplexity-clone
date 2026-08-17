@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { Plus, MessageSquare, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Plus, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { fetchAPI } from '../utils/api';
+import { onThreadsChanged } from '../utils/threads';
 import './Sidebar.css';
 
 interface Conversation {
@@ -11,45 +12,81 @@ interface Conversation {
   created_at: string;
 }
 
-export const Sidebar: React.FC = () => {
+interface SidebarProps {
+  onNavigate: () => void;
+  drawerOpen: boolean;
+  children?: React.ReactNode;
+}
+
+const COLLAPSE_KEY = 'sidebar-collapsed';
+const DRAWER_QUERY = '(max-width: 860px)';
+
+export const Sidebar: React.FC<SidebarProps> = ({ onNavigate, drawerOpen, children }) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [collapsed, setCollapsed] = useState(false);
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [loaded, setLoaded] = useState(false);
+  const [collapsedPref, setCollapsedPref] = useState(
+    () => localStorage.getItem(COLLAPSE_KEY) === 'true'
+  );
+  const [isDrawer, setIsDrawer] = useState(
+    () => window.matchMedia(DRAWER_QUERY).matches
+  );
+
+  // Collapsing is a desktop affordance. At drawer widths the panel is always
+  // full width, so a collapsed preference carried over from a wide window must
+  // not hide the labels here.
+  const collapsed = collapsedPref && !isDrawer;
 
   useEffect(() => {
-    if (user) {
-      loadConversations();
-    }
-  }, [user]);
+    const mq = window.matchMedia(DRAWER_QUERY);
+    const onChange = (e: MediaQueryListEvent) => setIsDrawer(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
-  const loadConversations = async () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const activeId = searchParams.get('chat');
+
+  const loadConversations = useCallback(async () => {
     try {
       const data = await fetchAPI('/conversations');
-      setConversations(data || []);
+      setConversations(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Failed to load conversations', err);
+      console.error('Failed to load threads', err);
+    } finally {
+      setLoaded(true);
     }
+  }, []);
+
+  useEffect(() => {
+    // Fetching on mount is the intended use of an effect. The rule can't see
+    // past the async boundary — every setState here happens after an await.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (user) loadConversations();
+  }, [user, loadConversations]);
+
+  // Chat creates threads as you send the first message; refetch when it says so.
+  useEffect(() => onThreadsChanged(loadConversations), [loadConversations]);
+
+  const toggleCollapsed = () => {
+    setCollapsedPref((prev) => {
+      localStorage.setItem(COLLAPSE_KEY, String(!prev));
+      return !prev;
+    });
   };
 
-  const handleNewChat = async () => {
-    try {
-      // Backend expects user_id and title (but we'll just pass generic title for now, 
-      // or we can let the backend generate it. The backend currently takes userId and title)
-      const res = await fetchAPI('/newChat', {
-        method: 'POST',
-        body: JSON.stringify({ userId: user.user?.id || user.id, title: 'New Conversation' }),
-      });
-      if (res && res.length > 0) {
-        navigate(`/?chat=${res[0].id}`);
-        loadConversations();
-      }
-    } catch (err) {
-      console.error('Failed to create new chat', err);
-      // Fallback: just go home
-      navigate('/');
-    }
+  const handleNewChat = () => {
+    // Clearing the thread param returns to the ask screen. The thread record
+    // is created by the first message, so clicking this never leaves an empty
+    // "New Conversation" row behind.
+    navigate('/');
+    onNavigate();
+  };
+
+  const openThread = (id: string) => {
+    navigate(`/?chat=${id}`);
+    onNavigate();
   };
 
   const handleLogout = () => {
@@ -57,48 +94,79 @@ export const Sidebar: React.FC = () => {
     navigate('/login');
   };
 
+  const initial = user?.email?.charAt(0).toUpperCase() || 'U';
+
   return (
-    <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
+    <aside
+      className={`sidebar ${collapsed ? 'collapsed' : ''} ${drawerOpen ? 'open' : ''}`}
+      aria-label="Threads"
+    >
       <div className="sidebar-header">
-        {!collapsed && <h2>Perplexity Clone</h2>}
-        <button className="collapse-btn" onClick={() => setCollapsed(!collapsed)}>
-          {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+        {!collapsed && (
+          <div className="brand">
+            <span className="brand-mark" aria-hidden="true">
+              §
+            </span>
+            <span className="brand-name">Cited</span>
+          </div>
+        )}
+        <button
+          className="icon-btn collapse-btn"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
         </button>
+        {children}
       </div>
 
-      <button className="new-chat-btn btn-primary" onClick={handleNewChat}>
-        <Plus size={20} />
-        {!collapsed && <span>New Thread</span>}
+      <button
+        className="new-chat-btn"
+        onClick={handleNewChat}
+        title="New thread"
+        aria-label="New thread"
+      >
+        <Plus size={18} />
+        {!collapsed && <span>New thread</span>}
       </button>
 
-      <div className="conversations-list">
-        {!collapsed && <div className="list-title">Recent Threads</div>}
-        {conversations.map(conv => (
-          <div 
-            key={conv.id} 
-            className={`conversation-item ${location.search.includes(conv.id) ? 'active' : ''}`}
-            onClick={() => navigate(`/?chat=${conv.id}`)}
+      <nav className="conversations-list">
+        {!collapsed && <div className="list-title">Threads</div>}
+
+        {loaded && conversations.length === 0 && !collapsed && (
+          <p className="list-empty">
+            Your threads collect here once you ask something.
+          </p>
+        )}
+
+        {conversations.map((conv, i) => (
+          <button
+            key={conv.id}
+            className={`conversation-item ${activeId === conv.id ? 'active' : ''}`}
+            onClick={() => openThread(conv.id)}
+            title={conv.title || 'Untitled thread'}
           >
-            <MessageSquare size={18} className="conv-icon" />
-            {!collapsed && <span className="conv-title">{conv.title || 'Untitled Chat'}</span>}
-          </div>
+            <span className="conv-index" aria-hidden="true">
+              {String(conversations.length - i).padStart(2, '0')}
+            </span>
+            {!collapsed && (
+              <span className="conv-title">{conv.title || 'Untitled thread'}</span>
+            )}
+          </button>
         ))}
-      </div>
+      </nav>
 
       <div className="sidebar-footer">
-        <div className="user-profile">
-          <div className="avatar">
-            {user?.email?.charAt(0).toUpperCase() || 'U'}
+        <div className="user-profile" title={user?.email || 'Signed in'}>
+          <div className="avatar" aria-hidden="true">
+            {initial}
           </div>
-          {!collapsed && (
-            <div className="user-info">
-              <span className="user-email">{user?.email || 'User'}</span>
-            </div>
-          )}
+          {!collapsed && <span className="user-email">{user?.email || 'Signed in'}</span>}
         </div>
-        <button className="logout-btn" onClick={handleLogout} title="Sign Out">
-          <LogOut size={16} className="logout-icon" />
-          {!collapsed && <span>Sign Out</span>}
+        <button className="logout-btn" onClick={handleLogout} title="Sign out">
+          <LogOut size={16} />
+          {!collapsed && <span>Sign out</span>}
         </button>
       </div>
     </aside>

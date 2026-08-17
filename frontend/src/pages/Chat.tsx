@@ -1,248 +1,352 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Send, ArrowRight } from 'lucide-react';
-import { MessageBubble, type Message } from '../components/MessageBubble';
-import { getSSEEndpoint, fetchAPI } from '../utils/api';
-import { useAuth } from '../context/AuthContext';
+import { ArrowUp, Square } from 'lucide-react';
+import { MessageBubble, type Message, type Source } from '../components/MessageBubble';
+import { getSSEEndpoint, fetchAPI, getToken } from '../utils/api';
+import { SSEParser } from '../utils/sse';
+import { threadsChanged } from '../utils/threads';
 import './Chat.css';
+
+const SUGGESTIONS = [
+  'What changed in the EU AI Act this year?',
+  'How do mRNA vaccines actually work?',
+  'Is nuclear power cheaper than solar now?',
+];
+
+const MAX_TITLE = 60;
 
 export const Chat: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const chatId = searchParams.get('chat');
-  const { user } = useAuth();
-  
+
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!chatId) {
-      setMessages([]);
-    } else {
-      loadHistory(chatId);
-    }
-  }, [chatId]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const loadHistory = async (id: string) => {
+  // The id this component created itself. The URL update that follows would
+  // otherwise re-trigger loadHistory and wipe the message still streaming.
+  const selfCreatedId = useRef<string | null>(null);
+  // Only auto-scroll while the user is already at the bottom.
+  const pinnedToBottom = useRef(true);
+
+  /* ---------------------------------------------------------------- history */
+
+  const loadHistory = useCallback(async (id: string) => {
     try {
       const msgs = await fetchAPI(`/conversations/${id}`, { method: 'POST' });
-      if (msgs && Array.isArray(msgs)) {
-        const formatted = msgs.map((m: any) => ({
-          role: m.role,
-          content: m.content,
-          sources: m.sources ? JSON.parse(m.sources) : undefined,
-          followUps: m.follow_ups ? JSON.parse(m.follow_ups) : undefined,
-          isStreaming: false
-        }));
-        setMessages(formatted);
-      }
+      if (!Array.isArray(msgs)) return;
+
+      setMessages(
+        msgs.map((m: Record<string, unknown>) => ({
+          role: m.role === 'user' ? 'user' : 'assistant',
+          content: String(m.content ?? ''),
+          sources: safeParse<Source[]>(m.sources),
+          followUps: safeParse<string[]>(m.follow_ups),
+          isStreaming: false,
+        }))
+      );
     } catch (err) {
       console.error('Failed to load history', err);
+      setError('Could not load this thread. Try opening it again.');
     }
-  };
+  }, []);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // Leaving a thread clears the transcript. This is the "adjust state when a
+  // prop changes" pattern rather than an effect, so the empty state renders in
+  // the same pass instead of flashing the previous thread's messages first.
+  const [syncedChatId, setSyncedChatId] = useState(chatId);
+  if (syncedChatId !== chatId) {
+    setSyncedChatId(chatId);
+    if (!chatId) {
+      setMessages([]);
+      setError('');
+    }
+  }
+
+  useEffect(() => {
+    if (!chatId) return;
+    // Skip the refetch for a thread this component just created — its messages
+    // are already on screen and one of them is mid-stream.
+    if (chatId === selfCreatedId.current) return;
+    loadHistory(chatId);
+  }, [chatId, loadHistory]);
+
+  // Cancel any in-flight stream when the page goes away.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  /* --------------------------------------------------------------- scrolling */
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    pinnedToBottom.current = distance < 120;
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (!pinnedToBottom.current) return;
+    // 'auto' during a stream: smooth scrolling on every token never settles.
+    const behavior = isLoading ? 'auto' : 'smooth';
+    endRef.current?.scrollIntoView({ behavior, block: 'end' });
+  }, [messages, isLoading]);
+
+  /* ------------------------------------------------------------------ input */
+
+  const autoResize = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+  }, []);
+
+  useEffect(autoResize, [query, autoResize]);
+
+  /* ------------------------------------------------------------------- send */
+
+  const updateLast = (patch: Partial<Message>) => {
+    setMessages((prev) => {
+      if (!prev.length) return prev;
+      const next = [...prev];
+      next[next.length - 1] = { ...next[next.length - 1], ...patch };
+      return next;
+    });
+  };
 
   const handleSend = async (text: string) => {
-    if (!text.trim() || isLoading) return;
+    const trimmed = text.trim();
+    if (!trimmed || isLoading) return;
 
+    setError('');
+    const isFollowUp = Boolean(chatId);
     let activeChatId = chatId;
 
-    // Create a new chat if none exists
     if (!activeChatId) {
       try {
+        const title =
+          trimmed.length > MAX_TITLE ? `${trimmed.slice(0, MAX_TITLE).trimEnd()}…` : trimmed;
         const res = await fetchAPI('/newChat', {
           method: 'POST',
-          body: JSON.stringify({ title: text.substring(0, 50) + '...' }),
+          body: JSON.stringify({ title }),
         });
-        if (res && res.length > 0) {
-          activeChatId = res[0].id;
-          setSearchParams({ chat: res[0].id });
-        }
+        if (!Array.isArray(res) || !res.length) throw new Error('No thread returned');
+
+        activeChatId = res[0].id;
+        selfCreatedId.current = activeChatId;
+        setSearchParams({ chat: activeChatId! }, { replace: true });
+        threadsChanged();
       } catch (err) {
-        console.error('Failed to create new chat', err);
-        return; // Stop if we can't create a chat
+        console.error('Failed to create thread', err);
+        setError('Could not start a thread. Check that the server is running.');
+        return;
       }
     }
 
-    const userMessage: Message = { role: 'user', content: text };
-    setMessages(prev => [...prev, userMessage]);
     setQuery('');
     setIsLoading(true);
+    pinnedToBottom.current = true;
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', content: trimmed },
+      { role: 'assistant', content: '', isStreaming: true },
+    ]);
 
-    setMessages(prev => [...prev, { role: 'assistant', content: '', isStreaming: true }]);
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
-      const endpoint = chatId ? '/perplexity_ask/follow-up' : '/perplexity_ask';
-      
+      const endpoint = isFollowUp ? '/perplexity_ask/follow-up' : '/perplexity_ask';
       const response = await fetch(getSSEEndpoint(endpoint), {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user?.session?.access_token || ''}`
+          Authorization: `Bearer ${getToken()}`,
         },
-        body: JSON.stringify({ query: text, conversationID: activeChatId }),
+        body: JSON.stringify({ query: trimmed, conversationID: activeChatId }),
+        signal: controller.signal,
       });
 
-      if (!response.body) throw new Error("No response body");
+      if (!response.ok || !response.body) {
+        throw new Error(`The server responded with ${response.status}.`);
+      }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      
-      let aiContent = '';
-      let sources: any[] = [];
-      let followUps: string[] = [];
+      const parser = new SSEParser();
 
-      while (true) {
+      let answer = '';
+      let streamError = '';
+
+      const consume = (event: string, raw: string) => {
+        let data: unknown;
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          return; // a frame we can't read is a frame we skip
+        }
+
+        if (event === 'sources' && Array.isArray(data)) {
+          updateLast({ sources: data as Source[] });
+        } else if (event === 'text') {
+          const delta = (data as { delta?: string })?.delta;
+          if (typeof delta === 'string') {
+            answer += delta;
+            updateLast({ content: answer });
+          }
+        } else if (event === 'followUps' && Array.isArray(data)) {
+          updateLast({ followUps: data as string[] });
+        } else if (event === 'error') {
+          streamError = (data as { message?: string })?.message || 'The answer stopped early.';
+        }
+      };
+
+      // Read to completion. The 'end' event marks a clean finish, but the
+      // stream closing is what actually ends the loop — so a server that dies
+      // mid-answer still releases the UI.
+      for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
-        
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-        
-        for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            const eventType = line.substring(7).trim();
-            const dataLineIndex = lines.indexOf(line) + 1;
-            if (dataLineIndex < lines.length && lines[dataLineIndex].startsWith('data: ')) {
-              const dataStr = lines[dataLineIndex].substring(6).trim();
-              if (!dataStr) continue;
-              
-              try {
-                const data = JSON.parse(dataStr);
-                
-                if (eventType === 'sources') {
-                  sources = data;
-                  setMessages(prev => {
-                    const newMsgs = [...prev];
-                    if (newMsgs.length > 0) {
-                      newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], sources };
-                    }
-                    return newMsgs;
-                  });
-                } else if (eventType === 'text') {
-                  aiContent += data.delta;
-                  setMessages(prev => {
-                    const newMsgs = [...prev];
-                    if (newMsgs.length > 0) {
-                      newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], content: aiContent };
-                    }
-                    return newMsgs;
-                  });
-                } else if (eventType === 'followUps') {
-                  followUps = data;
-                  setMessages(prev => {
-                    const newMsgs = [...prev];
-                    if (newMsgs.length > 0) {
-                      newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], followUps };
-                    }
-                    return newMsgs;
-                  });
-                } else if (eventType === 'end') {
-                  setMessages(prev => {
-                    const newMsgs = [...prev];
-                    if (newMsgs.length > 0) {
-                      newMsgs[newMsgs.length - 1] = { ...newMsgs[newMsgs.length - 1], isStreaming: false };
-                    }
-                    return newMsgs;
-                  });
-                  setIsLoading(false);
-                  break;
-                }
-              } catch (e) {
-                // Ignore parse errors from partial chunks
-              }
-            }
-          }
+        for (const evt of parser.push(decoder.decode(value, { stream: true }))) {
+          consume(evt.event, evt.data);
         }
       }
-    } catch (error) {
-      console.error("Chat error:", error);
-      setMessages(prev => {
-        const newMsgs = [...prev];
-        if (newMsgs.length > 0) {
-          newMsgs[newMsgs.length - 1] = { 
-            role: 'assistant', 
-            content: 'An error occurred while fetching the response.', 
-            isStreaming: false 
-          };
-        }
-        return newMsgs;
-      });
+      for (const evt of parser.flush()) consume(evt.event, evt.data);
+
+      if (streamError) setError(streamError);
+      if (!answer && !streamError) {
+        setError('The server returned an empty answer. Try asking again.');
+      }
+      threadsChanged();
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') {
+        // The user stopped it on purpose; whatever streamed in stays put.
+      } else {
+        console.error('Chat error', err);
+        setError(
+          (err as Error)?.message || 'Something went wrong reaching the server.'
+        );
+      }
+    } finally {
+      // Runs on every path, so the composer can never stay stuck.
+      abortRef.current = null;
+      updateLast({ isStreaming: false });
       setIsLoading(false);
     }
   };
 
-  const handleFollowUpClick = (question: string) => {
-    handleSend(question);
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Enter sends; Shift+Enter breaks the line. Never send mid-IME-composition.
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      handleSend(query);
+    }
   };
 
-  return (
-    <div className="chat-container">
-      {messages.length === 0 ? (
-        <div className="hero-section animate-fade-in">
-          <h1>Where knowledge begins</h1>
-          <div className="search-box glass-panel">
-            <input 
-              type="text" 
-              placeholder="Ask anything..." 
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend(query)}
-            />
-            <button 
-              className="send-btn" 
-              onClick={() => handleSend(query)}
-              disabled={isLoading || !query.trim()}
-            >
-              <ArrowRight size={24} />
-            </button>
-          </div>
-          <div className="suggested-queries">
-            <button onClick={() => handleSend("What are the latest AI models?")}>What are the latest AI models?</button>
-            <button onClick={() => handleSend("Explain quantum computing")}>Explain quantum computing</button>
-            <button onClick={() => handleSend("Give me a healthy dinner recipe")}>Give me a healthy dinner recipe</button>
-          </div>
-        </div>
+  /* ------------------------------------------------------------------ render */
+
+  const composer = (
+    <div className="composer">
+      <textarea
+        ref={textareaRef}
+        className="composer-input"
+        rows={1}
+        placeholder={messages.length ? 'Ask a follow-up…' : 'Ask anything…'}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={handleKeyDown}
+        aria-label="Your question"
+      />
+      {isLoading ? (
+        <button
+          className="composer-btn stop"
+          onClick={() => abortRef.current?.abort()}
+          aria-label="Stop generating"
+          title="Stop"
+        >
+          <Square size={14} fill="currentColor" />
+        </button>
       ) : (
-        <div className="chat-interface">
-          <div className="messages-area">
-            {messages.map((msg, idx) => (
-              <MessageBubble 
-                key={idx} 
-                message={msg} 
-                onFollowUpClick={handleFollowUpClick} 
-              />
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
-          <div className="chat-input-area">
-            <div className="search-box glass-panel small-search">
-              <input 
-                type="text" 
-                placeholder="Ask a follow up..." 
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend(query)}
-              />
-              <button 
-                className="send-btn" 
-                onClick={() => handleSend(query)}
-                disabled={isLoading || !query.trim()}
-              >
-                <Send size={20} />
-              </button>
-            </div>
-          </div>
-        </div>
+        <button
+          className="composer-btn"
+          onClick={() => handleSend(query)}
+          disabled={!query.trim()}
+          aria-label="Send question"
+          title="Send"
+        >
+          <ArrowUp size={18} />
+        </button>
       )}
     </div>
   );
+
+  if (messages.length === 0) {
+    return (
+      <div className="chat-container">
+        <div className="ask-screen animate-rise">
+          <div className="ask-inner">
+            <p className="ask-eyebrow">Answers with receipts</p>
+            <h1 className="ask-title">
+              Ask anything.
+              <br />
+              <em>Check everything.</em>
+            </h1>
+            <p className="ask-sub">
+              Every claim in the answer carries a numbered footnote back to the page
+              it came from.
+            </p>
+
+            {error && <div className="notice error">{error}</div>}
+
+            {composer}
+
+            <div className="suggestions">
+              {SUGGESTIONS.map((s) => (
+                <button key={s} className="suggestion" onClick={() => handleSend(s)}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="chat-container">
+      <div className="messages-area" ref={scrollRef} onScroll={handleScroll}>
+        <div className="messages-inner">
+          {messages.map((msg, idx) => (
+            <MessageBubble
+              key={idx}
+              message={msg}
+              domPrefix={`m${idx}`}
+              onFollowUpClick={handleSend}
+            />
+          ))}
+          {error && <div className="notice error">{error}</div>}
+          <div ref={endRef} />
+        </div>
+      </div>
+
+      <div className="composer-dock">
+        <div className="composer-shell">{composer}</div>
+      </div>
+    </div>
+  );
 };
+
+function safeParse<T>(value: unknown): T | undefined {
+  if (!value) return undefined;
+  if (typeof value !== 'string') return value as T;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return undefined;
+  }
+}

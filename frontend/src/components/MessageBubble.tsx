@@ -1,7 +1,7 @@
-import React from 'react';
-import DOMPurify from 'dompurify';
-import { marked } from 'marked';
+import React, { useMemo, useState } from 'react';
+import { Check, Copy, CornerDownRight } from 'lucide-react';
 import { SourceCard } from './SourceCard';
+import { renderAnswer } from '../utils/renderAnswer';
 import './MessageBubble.css';
 
 export interface Source {
@@ -19,69 +19,113 @@ export interface Message {
 
 interface MessageBubbleProps {
   message: Message;
+  domPrefix: string;
   onFollowUpClick?: (question: string) => void;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onFollowUpClick }) => {
-  const isUser = message.role === 'user';
+export const MessageBubble: React.FC<MessageBubbleProps> = ({
+  message,
+  domPrefix,
+  onFollowUpClick,
+}) => {
+  const [copied, setCopied] = useState(false);
 
-  const renderContent = () => {
-    if (isUser) {
-      return <div className="user-text">{message.content}</div>;
-    }
+  const html = useMemo(
+    () =>
+      message.role === 'assistant'
+        ? renderAnswer(message.content, message.sources, domPrefix)
+        : '',
+    [message.content, message.sources, message.role, domPrefix]
+  );
 
-    const htmlContent = marked.parse(message.content || '', { async: false }) as string;
-    const cleanContent = DOMPurify.sanitize(htmlContent);
-
+  if (message.role === 'user') {
     return (
-      <div 
-        className="markdown-content ai-text" 
-        dangerouslySetInnerHTML={{ __html: cleanContent || (message.isStreaming ? '<span className="cursor"></span>' : '') }} 
-      />
+      <article className="turn">
+        <h2 className="question">{message.content}</h2>
+      </article>
     );
+  }
+
+  const sources = message.sources ?? [];
+  const hasText = message.content.trim().length > 0;
+
+  const copyAnswer = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // Clipboard blocked (insecure origin or denied permission) — the button
+      // simply doesn't confirm, and the text is still selectable.
+    }
   };
 
   return (
-    <div className={`message-wrapper ${isUser ? 'user-wrapper' : 'ai-wrapper'}`}>
-      {!isUser && (
-        <div className="message-icon ai-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2a10 10 0 1 0 10 10H12V2z"/>
-            <path d="M12 12 2.1 12"/>
-            <path d="m12 12 7.1-7.1"/>
-          </svg>
+    <article className="turn answer-turn">
+      {sources.length > 0 && (
+        <section className="sources" aria-label="Sources">
+          <div className="section-label">
+            Sources
+            <span className="count">{sources.length}</span>
+          </div>
+          <div className="sources-rail">
+            {sources.map((source, i) => (
+              <SourceCard
+                key={`${source.url}-${i}`}
+                id={`${domPrefix}-src-${i + 1}`}
+                index={i + 1}
+                title={source.title}
+                url={source.url}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div className="section-label">Answer</div>
+
+      {!hasText && message.isStreaming ? (
+        <p className="working" role="status">
+          <span className="working-dots" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          {sources.length > 0
+            ? `Reading ${sources.length} sources`
+            : 'Searching the web'}
+        </p>
+      ) : (
+        <div
+          className={`prose answer ${message.isStreaming ? 'is-streaming' : ''}`}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      )}
+
+      {hasText && !message.isStreaming && (
+        <div className="answer-actions">
+          <button className="ghost-btn" onClick={copyAnswer}>
+            {copied ? <Check size={14} /> : <Copy size={14} />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
         </div>
       )}
-      
-      <div className="message-content-container">
-        {isUser && <div className="message-icon user-icon">U</div>}
-        
-        {message.sources && message.sources.length > 0 && (
-          <div className="sources-container">
-            {message.sources.map((source, idx) => (
-              <SourceCard key={idx} title={source.title} url={source.url} />
-            ))}
-          </div>
-        )}
 
-        {renderContent()}
-
-        {message.followUps && message.followUps.length > 0 && !message.isStreaming && (
-          <div className="follow-ups-container">
-            <div className="follow-ups-title">Related</div>
-            {message.followUps.map((question, idx) => (
-              <button 
-                key={idx} 
-                className="follow-up-btn"
-                onClick={() => onFollowUpClick && onFollowUpClick(question)}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-                {question}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+      {message.followUps && message.followUps.length > 0 && !message.isStreaming && (
+        <section className="follow-ups">
+          <div className="section-label">Keep going</div>
+          {message.followUps.map((question, i) => (
+            <button
+              key={i}
+              className="follow-up"
+              onClick={() => onFollowUpClick?.(question)}
+            >
+              <CornerDownRight size={15} />
+              <span>{question}</span>
+            </button>
+          ))}
+        </section>
+      )}
+    </article>
   );
 };

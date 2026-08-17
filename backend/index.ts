@@ -35,6 +35,33 @@ interface MockMessage {
 const mockConversations: MockConversation[] = [];
 const mockMessages: MockMessage[] = [];
 
+/**
+ * Follow-ups were hardcoded to "What else happened?" regardless of topic, which
+ * is worse than showing nothing. Derive them from the answer instead, and fall
+ * back to an empty list if the model is unavailable — the UI hides the section
+ * when there are none.
+ */
+async function generateFollowUps(query: string, answer: string): Promise<string[]> {
+    if (!answer.trim()) return [];
+    try {
+        const result = await model.generateContent(
+            `A user asked: "${query}"\n\nThey received this answer:\n${answer.slice(0, 4000)}\n\n` +
+            `Write 3 short follow-up questions they would plausibly ask next. ` +
+            `Each must be a standalone question under 12 words. ` +
+            `Return ONLY a JSON array of 3 strings, no markdown fence, no commentary.`
+        );
+        const raw = result.response.text().trim().replace(/^```(?:json)?|```$/g, '').trim();
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+            .filter((q): q is string => typeof q === 'string' && q.trim().length > 0)
+            .slice(0, 3);
+    } catch (err) {
+        console.error('Follow-up generation failed', err);
+        return [];
+    }
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -149,8 +176,13 @@ app.post(["/perplexity_ask", "/perplexityAsk"], async (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
+        // Stops nginx and friends from buffering the stream into one blob.
+        res.setHeader('X-Accel-Buffering', 'no');
+        res.flushHeaders();
 
         const sendSSE = (event: string, data: any) => {
+            // JSON.stringify never emits a raw newline, so each frame stays a
+            // single data line and the client's frame boundaries hold.
             res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
         };
 
@@ -173,7 +205,7 @@ app.post(["/perplexity_ask", "/perplexityAsk"], async (req, res) => {
             sendSSE('text', { delta: chunkText });
         }
 
-        const followUps = ["What else happened?", "Can you explain more?"];
+        const followUps = await generateFollowUps(query, aiFullContent);
         sendSSE('followUps', followUps);
         
         // Save AI message
@@ -239,8 +271,13 @@ app.post("/perplexity_ask/follow-up", async (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
+        // Stops nginx and friends from buffering the stream into one blob.
+        res.setHeader('X-Accel-Buffering', 'no');
+        res.flushHeaders();
 
         const sendSSE = (event: string, data: any) => {
+            // JSON.stringify never emits a raw newline, so each frame stays a
+            // single data line and the client's frame boundaries hold.
             res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
         };
 
@@ -263,7 +300,7 @@ app.post("/perplexity_ask/follow-up", async (req, res) => {
             sendSSE('text', { delta: chunkText });
         }
 
-        const followUps = ["Tell me more about this", "What are the counter-arguments?"];
+        const followUps = await generateFollowUps(query, aiFullContent);
         sendSSE('followUps', followUps);
 
         // Save AI message

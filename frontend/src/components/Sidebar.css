@@ -1,11 +1,12 @@
 .sidebar {
-  width: 260px;
-  background-color: var(--sidebar-bg);
-  border-right: 1px solid var(--sidebar-border);
+  width: 264px;
+  flex-shrink: 0;
+  background-color: var(--ink-850);
+  border-right: 1px solid var(--rule);
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  transition: width 0.3s ease;
+  height: 100%;
+  transition: width 0.26s cubic-bezier(0.2, 0.7, 0.3, 1);
   overflow: hidden;
 }
 
@@ -13,135 +14,236 @@
   width: 68px;
 }
 
+/* --------------------------------------------------------------------------
+   Header / brand
+   -------------------------------------------------------------------------- */
 .sidebar-header {
-  padding: 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 70px;
+  gap: 8px;
+  height: 60px;
+  padding: 0 14px;
+  flex-shrink: 0;
 }
 
-.sidebar-header h2 {
-  font-size: 1.2rem;
-  font-weight: 600;
-  white-space: nowrap;
+.sidebar.collapsed .sidebar-header {
+  justify-content: center;
+  padding: 0 8px;
 }
 
-.collapse-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+/* The section mark is the footnote made into a logo. */
+.brand-mark {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
-  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  font-family: var(--font-read);
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--cite);
+  background: var(--cite-soft);
+  border: 1px solid var(--cite-line);
+  border-radius: 7px;
 }
 
-.collapse-btn:hover {
-  background: var(--card-bg);
-  color: var(--text-primary);
-}
-
-.new-chat-btn {
-  margin: 0 16px 20px;
+.brand-name {
+  font-size: 1.02rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   white-space: nowrap;
 }
 
-.sidebar.collapsed .new-chat-btn {
-  margin: 0 12px 20px;
-  padding: 12px;
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--paper-faint);
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
 }
 
+.icon-btn:hover {
+  background: var(--ink-750);
+  color: var(--paper);
+}
+
+/* --------------------------------------------------------------------------
+   New thread
+   -------------------------------------------------------------------------- */
+.new-chat-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 14px 18px;
+  padding: 10px 14px;
+  flex-shrink: 0;
+
+  background: var(--ink-800);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-sm);
+  color: var(--paper);
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.new-chat-btn:hover {
+  background: var(--ink-750);
+  border-color: var(--iris-line);
+}
+
+.sidebar.collapsed .new-chat-btn {
+  margin: 0 14px 18px;
+  padding: 10px;
+  justify-content: center;
+}
+
+/* --------------------------------------------------------------------------
+   Thread list
+   -------------------------------------------------------------------------- */
 .conversations-list {
   flex: 1;
   overflow-y: auto;
-  padding: 0 12px;
+  overflow-x: hidden;
+  padding: 0 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .list-title {
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--paper-faint);
   font-weight: 600;
-  margin: 10px 0 10px 8px;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.09em;
+  margin: 4px 0 8px 8px;
+}
+
+.list-empty {
+  margin: 4px 8px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--paper-faint);
 }
 
 .conversation-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--paper-dim);
+  text-align: left;
   cursor: pointer;
-  color: var(--text-secondary);
-  transition: all 0.2s ease;
-  margin-bottom: 4px;
-  white-space: nowrap;
+  transition: background-color 0.16s ease, color 0.16s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.conversation-item:hover, .conversation-item.active {
-  background-color: var(--card-bg);
-  color: var(--text-primary);
+.conversation-item:hover {
+  background-color: var(--ink-800);
+  color: var(--paper);
+}
+
+.conversation-item.active {
+  background-color: var(--ink-750);
+  color: var(--paper);
+}
+
+/* Threads are numbered because the count is real information —
+   these are your last N questions, newest first. */
+.conv-index {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+  color: var(--paper-faint);
+  flex-shrink: 0;
+  width: 18px;
+  text-align: right;
+}
+
+.conversation-item.active .conv-index {
+  color: var(--cite);
+}
+
+.sidebar.collapsed .conv-index {
+  width: auto;
+  margin: 0 auto;
 }
 
 .conv-title {
-  font-size: 0.9rem;
+  font-size: 0.875rem;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
+/* --------------------------------------------------------------------------
+   Footer
+   -------------------------------------------------------------------------- */
 .sidebar-footer {
-  padding: 16px;
-  border-top: 1px solid var(--sidebar-border);
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--rule);
+  flex-shrink: 0;
 }
 
 .user-profile {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
+  gap: 10px;
+  padding: 6px 4px;
+  min-width: 0;
 }
 
-.user-profile:hover {
-  background: var(--card-bg);
+.sidebar.collapsed .user-profile {
+  justify-content: center;
 }
 
 .avatar {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
   border-radius: 50%;
-  background: var(--accent-color);
-  color: white;
+  background: var(--iris-soft);
+  border: 1px solid var(--iris-line);
+  color: var(--iris-bright);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  flex-shrink: 0;
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex: 1;
-  overflow: hidden;
+  font-size: 0.82rem;
 }
 
 .user-email {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  color: var(--paper-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.logout-icon {
-  color: var(--text-secondary);
+  min-width: 0;
 }
 
 .logout-btn {
@@ -149,28 +251,72 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 10px;
-  margin-top: 8px;
+  padding: 9px 10px;
+  margin-top: 6px;
+
   background: transparent;
-  border: 1px solid var(--sidebar-border);
-  border-radius: 8px;
-  color: var(--text-secondary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--paper-faint);
+  font-size: 0.85rem;
+  white-space: nowrap;
   cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.9rem;
+  transition: background-color 0.18s ease, color 0.18s ease,
+    border-color 0.18s ease;
 }
 
 .logout-btn:hover {
-  background: rgba(255, 59, 48, 0.1);
-  color: var(--danger, #ff3b30);
-  border-color: rgba(255, 59, 48, 0.3);
-}
-
-.logout-btn:hover .logout-icon {
-  color: var(--danger, #ff3b30);
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: rgba(240, 115, 106, 0.28);
 }
 
 .sidebar.collapsed .logout-btn {
   justify-content: center;
-  padding: 10px 0;
+  padding: 9px 0;
+}
+
+/* --------------------------------------------------------------------------
+   Mobile: off-canvas drawer
+   -------------------------------------------------------------------------- */
+@media (max-width: 860px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+
+    width: min(298px, 86vw);
+    height: 100dvh;
+    padding-top: env(safe-area-inset-top);
+
+    box-shadow: var(--shadow-lift);
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.3, 1);
+    visibility: hidden;
+  }
+
+  .sidebar.open {
+    transform: none;
+    visibility: visible;
+  }
+
+  /* Collapsing is a desktop affordance — on mobile the drawer is always full. */
+  .sidebar.collapsed {
+    width: min(298px, 86vw);
+  }
+
+  .collapse-btn {
+    display: none;
+  }
+
+  /* Touch targets get taller. */
+  .conversation-item {
+    padding: 12px 10px;
+  }
+
+  .new-chat-btn {
+    padding: 12px 14px;
+  }
 }

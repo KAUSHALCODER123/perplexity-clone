@@ -1,156 +1,405 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/* ==========================================================================
+   Cited — design tokens
+   Ground: deep slate-plum, not pure black. Text: warm parchment.
+   Two accents, two jobs: amber = provenance, iris = interaction.
+   ========================================================================== */
 
 :root {
-  --bg-color: #0d0d0d;
-  --sidebar-bg: #141414;
-  --sidebar-border: #262626;
-  --text-primary: #f2f2f2;
-  --text-secondary: #a1a1aa;
-  --accent-color: #3b82f6;
-  --accent-hover: #2563eb;
-  --card-bg: #1a1a1a;
-  --card-border: #333;
-  --danger: #ef4444;
-  --success: #22c55e;
+  /* Surfaces, darkest to lightest */
+  --ink-900: #14131a;
+  --ink-850: #191821;
+  --ink-800: #1e1d28;
+  --ink-750: #252433;
+  --ink-700: #2f2d3e;
+
+  /* Text */
+  --paper: #ece9e2;
+  --paper-dim: #9b98a8;
+  --paper-faint: #6e6b7c;
+
+  /* Provenance — sources, citations, footnotes. Nothing else. */
+  --cite: #e8a33d;
+  --cite-soft: rgba(232, 163, 61, 0.14);
+  --cite-line: rgba(232, 163, 61, 0.35);
+
+  /* Interaction — buttons, focus, links, active state. Nothing else. */
+  --iris: #8f8ce8;
+  --iris-bright: #a5a2f0;
+  --iris-soft: rgba(143, 140, 232, 0.14);
+  --iris-line: rgba(143, 140, 232, 0.4);
+
+  --danger: #f0736a;
+  --danger-soft: rgba(240, 115, 106, 0.12);
+
+  /* Hairlines */
+  --rule: rgba(236, 233, 226, 0.09);
+  --rule-strong: rgba(236, 233, 226, 0.16);
+
+  /* Type */
+  --font-ui: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-read: 'Newsreader', ui-serif, Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Measure — the answer column never exceeds a comfortable reading width */
+  --measure: 46rem;
+
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 18px;
+
+  --shadow-lift: 0 18px 40px -22px rgba(0, 0, 0, 0.9);
+
+  /* Set by MainLayout so the composer can clear the mobile top bar */
+  --topbar-h: 0px;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
-  font-family: 'Inter', sans-serif;
-  background-color: var(--bg-color);
-  color: var(--text-primary);
+  font-family: var(--font-ui);
+  background-color: var(--ink-900);
+  color: var(--paper);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Keep the mobile drawer from letting the page rubber-band sideways */
+  overflow-x: hidden;
 }
 
-/* Scrollbar customization */
-::-webkit-scrollbar {
-  width: 8px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
-
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
-}
-
-/* Form Styles */
-.input-field {
-  width: 100%;
-  padding: 12px 16px;
-  background-color: var(--card-bg);
-  border: 1px solid var(--card-border);
-  color: var(--text-primary);
-  border-radius: 8px;
-  outline: none;
-  transition: all 0.2s ease;
-  font-size: 1rem;
-}
-
-.input-field:focus {
-  border-color: var(--accent-color);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-}
-
-.btn-primary {
-  background-color: var(--accent-color);
-  color: white;
-  padding: 12px 24px;
-  border: none;
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.btn-primary:hover {
-  background-color: var(--accent-hover);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background-color: transparent;
-  color: var(--text-secondary);
-  border: 1px solid var(--card-border);
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-secondary:hover {
-  background-color: var(--card-bg);
-  color: var(--text-primary);
-}
-
-/* Glassmorphism */
-.glass-panel {
-  background: rgba(26, 26, 26, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-/* Typography utilities */
-h1, h2, h3, h4, h5, h6 {
-  color: var(--text-primary);
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--paper);
   font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 a {
-  color: var(--accent-color);
+  color: var(--iris-bright);
   text-decoration: none;
 }
 a:hover {
   text-decoration: underline;
 }
 
-/* Markdown Content */
-.markdown-content p {
-  margin-bottom: 1rem;
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
 }
-.markdown-content ul, .markdown-content ol {
-  margin-left: 1.5rem;
-  margin-bottom: 1rem;
-}
-.markdown-content pre {
-  background: #000;
-  padding: 1rem;
-  border-radius: 8px;
-  overflow-x: auto;
-  margin-bottom: 1rem;
-}
-.markdown-content code {
-  font-family: monospace;
-  background: rgba(255,255,255,0.1);
-  padding: 2px 4px;
+
+/* One focus treatment everywhere, and it is always visible. */
+:focus-visible {
+  outline: 2px solid var(--iris);
+  outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* --------------------------------------------------------------------------
+   Scrollbars — thin, and only visible against the surface they sit on
+   -------------------------------------------------------------------------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-700) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--ink-700);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--paper-faint);
+  background-clip: content-box;
+}
+
+/* --------------------------------------------------------------------------
+   Motion
+   -------------------------------------------------------------------------- */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-rise {
+  animation: rise 0.45s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Shared primitives
+   -------------------------------------------------------------------------- */
+.field {
+  width: 100%;
+  padding: 12px 14px;
+  background-color: var(--ink-850);
+  border: 1px solid var(--rule-strong);
+  color: var(--paper);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  font-size: 1rem;
+}
+
+.field::placeholder {
+  color: var(--paper-faint);
+}
+
+.field:focus {
+  border-color: var(--iris);
+  box-shadow: 0 0 0 3px var(--iris-soft);
+  outline: none;
+}
+
+.btn-primary {
+  background-color: var(--iris);
+  color: #14131a;
+  padding: 12px 20px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--iris-bright);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.panel {
+  background: var(--ink-850);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+/* Visually hidden but available to screen readers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Answer prose — this is a document, so it is set like one
+   -------------------------------------------------------------------------- */
+.prose {
+  font-family: var(--font-read);
+  font-size: 1.12rem;
+  line-height: 1.7;
+  color: var(--paper);
+  overflow-wrap: break-word;
+}
+
+.prose > *:first-child {
+  margin-top: 0;
+}
+.prose > *:last-child {
+  margin-bottom: 0;
+}
+
+.prose p {
+  margin-bottom: 1.1em;
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+  font-family: var(--font-ui);
+  margin: 1.8em 0 0.6em;
+  letter-spacing: -0.02em;
+}
+
+.prose h1 {
+  font-size: 1.5rem;
+}
+.prose h2 {
+  font-size: 1.25rem;
+}
+.prose h3 {
+  font-size: 1.08rem;
+}
+.prose h4 {
+  font-size: 1rem;
+  color: var(--paper-dim);
+}
+
+.prose ul,
+.prose ol {
+  margin: 0 0 1.1em 1.3em;
+}
+
+.prose li {
+  margin-bottom: 0.45em;
+  padding-left: 0.2em;
+}
+
+.prose li::marker {
+  color: var(--paper-faint);
+}
+
+.prose strong {
+  font-weight: 600;
+  color: #fbf9f5;
+}
+
+.prose blockquote {
+  border-left: 2px solid var(--rule-strong);
+  padding-left: 1.1em;
+  margin: 0 0 1.1em;
+  color: var(--paper-dim);
+  font-style: italic;
+}
+
+.prose pre {
+  background: var(--ink-900);
+  border: 1px solid var(--rule);
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  margin-bottom: 1.1em;
+}
+
+.prose code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--ink-750);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+}
+
+.prose pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.prose hr {
+  border: none;
+  border-top: 1px solid var(--rule);
+  margin: 2em 0;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.1em;
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  display: block;
+  overflow-x: auto;
+}
+
+.prose th,
+.prose td {
+  border: 1px solid var(--rule);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.prose th {
+  background: var(--ink-800);
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------------------------
+   The signature: inline citations are live footnotes, in amber, set in mono
+   -------------------------------------------------------------------------- */
+.citation {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35em;
+  height: 1.35em;
+  padding: 0 0.32em;
+  margin: 0 0.12em;
+  vertical-align: 0.28em;
+
+  font-family: var(--font-mono);
+  font-size: 0.62em;
+  font-weight: 500;
+  line-height: 1;
+
+  color: var(--cite);
+  background: var(--cite-soft);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.citation:hover,
+.citation:focus-visible {
+  background: rgba(232, 163, 61, 0.26);
+  border-color: var(--cite-line);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 640px) {
+  .prose {
+    font-size: 1.06rem;
+  }
 }

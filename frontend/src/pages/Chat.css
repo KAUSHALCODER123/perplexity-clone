@@ -1,127 +1,258 @@
 .chat-container {
-  height: 100%;
   display: flex;
   flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
 
-/* Hero Section (No Chat Active) */
-.hero-section {
+/* ==========================================================================
+   Ask screen — the empty state is the front door, so it gets the thesis
+   ========================================================================== */
+.ask-screen {
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  max-width: 800px;
-  margin: 0 auto;
+  overflow-y: auto;
+  padding: 40px 24px calc(40px + env(safe-area-inset-bottom));
+}
+
+.ask-inner {
   width: 100%;
+  max-width: var(--measure);
 }
 
-.hero-section h1 {
-  font-size: 2.5rem;
-  margin-bottom: 40px;
-  background: linear-gradient(to right, #fff, #a1a1aa);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  font-weight: 700;
-  text-align: center;
+.ask-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cite);
+  margin-bottom: 18px;
 }
 
-.search-box {
+.ask-title {
+  font-family: var(--font-read);
+  font-size: clamp(2.2rem, 6.5vw, 3.6rem);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  margin-bottom: 18px;
+}
+
+/* The second line is the promise, so it is the one that gets the emphasis. */
+.ask-title em {
+  font-style: italic;
+  color: var(--cite);
+}
+
+.ask-sub {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--paper-dim);
+  max-width: 34rem;
+  margin-bottom: 30px;
+}
+
+/* ==========================================================================
+   Composer
+   ========================================================================== */
+.composer {
   display: flex;
-  align-items: center;
-  width: 100%;
-  padding: 8px 16px;
-  border-radius: 24px;
-  gap: 12px;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 8px 8px 8px 18px;
+
+  background: var(--ink-850);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-lg);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-.search-box input {
+.composer:focus-within {
+  border-color: var(--iris-line);
+  box-shadow: 0 0 0 3px var(--iris-soft);
+}
+
+.composer-input {
   flex: 1;
+  min-width: 0;
   background: transparent;
   border: none;
-  color: var(--text-primary);
-  font-size: 1.1rem;
-  padding: 12px 0;
   outline: none;
+  resize: none;
+  overflow-y: auto;
+
+  color: var(--paper);
+  /* 16px minimum, or iOS Safari zooms the viewport on focus. */
+  font-size: 1rem;
+  line-height: 1.55;
+  padding: 9px 0;
+  max-height: 180px;
 }
 
-.search-box input::placeholder {
-  color: var(--text-secondary);
+.composer-input::placeholder {
+  color: var(--paper-faint);
 }
 
-.send-btn {
-  background: var(--accent-color);
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
+.composer-btn {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+
+  background: var(--iris);
+  color: #14131a;
+  border: none;
+  border-radius: 50%;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.18s ease, opacity 0.18s ease,
+    transform 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.send-btn:hover:not(:disabled) {
-  background: var(--accent-hover);
-  transform: scale(1.05);
+.composer-btn:hover:not(:disabled) {
+  background: var(--iris-bright);
 }
 
-.send-btn:disabled {
-  background: var(--card-border);
-  color: var(--text-secondary);
+.composer-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.composer-btn:disabled {
+  background: var(--ink-750);
+  color: var(--paper-faint);
   cursor: not-allowed;
 }
 
-.suggested-queries {
+.composer-btn.stop {
+  background: var(--ink-750);
+  color: var(--paper);
+}
+
+.composer-btn.stop:hover {
+  background: var(--ink-700);
+}
+
+/* ==========================================================================
+   Suggestions
+   ========================================================================== */
+.suggestions {
   display: flex;
-  gap: 12px;
-  margin-top: 32px;
   flex-wrap: wrap;
-  justify-content: center;
+  gap: 8px;
+  margin-top: 20px;
 }
 
-.suggested-queries button {
+.suggestion {
   background: transparent;
-  border: 1px solid var(--card-border);
-  color: var(--text-secondary);
-  padding: 10px 16px;
-  border-radius: 20px;
-  font-size: 0.9rem;
+  border: 1px solid var(--rule-strong);
+  color: var(--paper-dim);
+  padding: 9px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  text-align: left;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.18s ease, color 0.18s ease,
+    border-color 0.18s ease;
 }
 
-.suggested-queries button:hover {
-  background: var(--card-bg);
-  color: var(--text-primary);
-  border-color: var(--text-secondary);
+.suggestion:hover {
+  background: var(--ink-800);
+  color: var(--paper);
+  border-color: var(--iris-line);
 }
 
-/* Chat Interface */
-.chat-interface {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
+/* ==========================================================================
+   Thread view
+   ========================================================================== */
 .messages-area {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 24px;
-  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+  padding: 28px 24px 8px;
 }
 
-.chat-input-area {
-  padding: 20px 24px;
-  background: linear-gradient(to top, var(--bg-color) 80%, transparent);
-  position: sticky;
-  bottom: 0;
-}
-
-.small-search {
-  max-width: 800px;
+.messages-inner {
+  max-width: var(--measure);
   margin: 0 auto;
+  width: 100%;
+}
+
+.composer-dock {
+  flex-shrink: 0;
+  padding: 10px 24px calc(18px + env(safe-area-inset-bottom));
+  /* Fades the scrolling answer out behind the composer instead of cutting it. */
+  background: linear-gradient(
+    to top,
+    var(--ink-900) 0%,
+    var(--ink-900) 62%,
+    transparent 100%
+  );
+}
+
+.composer-shell {
+  max-width: var(--measure);
+  margin: 0 auto;
+}
+
+/* ==========================================================================
+   Notices
+   ========================================================================== */
+.notice {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.notice.error {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid rgba(240, 115, 106, 0.26);
+}
+
+/* ==========================================================================
+   Mobile
+   ========================================================================== */
+@media (max-width: 860px) {
+  .messages-area {
+    padding: 18px 16px 4px;
+  }
+
+  .composer-dock {
+    padding: 8px 14px calc(14px + env(safe-area-inset-bottom));
+  }
+
+  .ask-screen {
+    /* Top-align on short screens so the keyboard doesn't shove content off. */
+    align-items: flex-start;
+    padding: 32px 20px calc(32px + env(safe-area-inset-bottom));
+  }
+
+  .ask-sub {
+    font-size: 0.94rem;
+    margin-bottom: 24px;
+  }
+
+  .suggestions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .suggestion {
+    border-radius: var(--radius);
+    padding: 12px 14px;
+  }
+}
+
+@media (max-width: 400px) {
+  .composer {
+    padding-left: 14px;
+  }
 }

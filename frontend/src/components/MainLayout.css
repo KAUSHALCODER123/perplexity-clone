@@ -1,13 +1,137 @@
 .main-layout {
   display: flex;
+  /* dvh tracks the collapsing mobile address bar; vh is the fallback. */
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  /* Never 100vw — that ignores the scrollbar and causes sideways scroll. */
+  width: 100%;
   overflow: hidden;
+  background-color: var(--ink-900);
 }
 
 .content-area {
   flex: 1;
+  min-width: 0; /* lets long content shrink instead of pushing the layout wide */
   position: relative;
-  overflow-y: auto;
-  background-color: var(--bg-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--ink-900);
+}
+
+/* --------------------------------------------------------------------------
+   Top bar — mobile only. Hidden on desktop, where the sidebar is always there.
+   -------------------------------------------------------------------------- */
+.topbar {
+  display: none;
+}
+
+.drawer-scrim {
+  display: none;
+}
+
+.drawer-close {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   Mobile: the sidebar becomes an off-canvas drawer
+   -------------------------------------------------------------------------- */
+@media (max-width: 860px) {
+  :root {
+    --topbar-h: 56px;
+  }
+
+  .main-layout {
+    display: block;
+    position: relative;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+
+    height: calc(56px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 8px 0;
+
+    background: rgba(20, 19, 26, 0.82);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .topbar-title {
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: -0.01em;
+  }
+
+  .topbar-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--paper-dim);
+    cursor: pointer;
+    transition: background-color 0.18s ease, color 0.18s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .topbar-btn:active {
+    background: var(--ink-800);
+    color: var(--paper);
+  }
+
+  .content-area {
+    height: 100dvh;
+    padding-top: calc(56px + env(safe-area-inset-top));
+  }
+
+  .drawer-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(10, 9, 14, 0.6);
+    backdrop-filter: blur(2px);
+
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s ease;
+  }
+
+  .main-layout.drawer-open .drawer-scrim {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .drawer-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--paper-dim);
+    cursor: pointer;
+  }
+
+  .drawer-close:active {
+    background: var(--ink-800);
+    color: var(--paper);
+  }
 }

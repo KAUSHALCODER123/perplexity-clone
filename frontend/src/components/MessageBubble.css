@@ -1,124 +1,267 @@
-.message-wrapper {
-  display: flex;
-  gap: 16px;
-  padding: 24px 0;
-  max-width: 800px;
-  margin: 0 auto;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+/* A turn is a section of a document, not a chat bubble: the question is the
+   heading, the answer is the body, the sources are the apparatus. */
+.turn {
+  padding-bottom: 8px;
 }
 
-.message-wrapper:last-child {
+.answer-turn {
+  padding-bottom: 40px;
+  margin-bottom: 40px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.messages-inner > .turn:last-of-type.answer-turn,
+.messages-inner > .answer-turn:last-child {
   border-bottom: none;
+  margin-bottom: 0;
 }
 
-.user-wrapper {
-  justify-content: flex-end;
+/* --------------------------------------------------------------------------
+   The question
+   -------------------------------------------------------------------------- */
+.question {
+  font-family: var(--font-read);
+  font-size: clamp(1.45rem, 3.6vw, 1.95rem);
+  font-weight: 400;
+  line-height: 1.28;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+  padding: 8px 0 22px;
+  overflow-wrap: break-word;
 }
 
-.message-content-container {
+/* --------------------------------------------------------------------------
+   Section labels — the same mono voice used for citations and domains,
+   because they all belong to the apparatus rather than the prose
+   -------------------------------------------------------------------------- */
+.section-label {
   display: flex;
-  flex-direction: column;
-  flex: 1;
-  max-width: 100%;
+  align-items: center;
+  gap: 8px;
+
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  margin-bottom: 12px;
 }
 
-.user-wrapper .message-content-container {
-  align-items: flex-end;
-}
-
-.message-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
+.section-label .count {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  font-weight: 600;
-  font-size: 0.9rem;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 0.62rem;
+  letter-spacing: 0;
+  color: var(--cite);
+  background: var(--cite-soft);
+  border-radius: 5px;
 }
 
-.ai-icon {
-  background: transparent;
-  color: var(--accent-color);
-  border: 1px solid var(--accent-color);
+/* --------------------------------------------------------------------------
+   Sources rail
+   -------------------------------------------------------------------------- */
+.sources {
+  margin-bottom: 26px;
 }
 
-.user-icon {
-  background: var(--card-bg);
-  color: var(--text-primary);
-  margin-bottom: 8px;
-}
-
-.user-text {
-  background: var(--card-bg);
-  padding: 16px 20px;
-  border-radius: 20px;
-  border-bottom-right-radius: 4px;
-  font-size: 1.1rem;
-  max-width: 80%;
-  line-height: 1.5;
-}
-
-.ai-text {
-  font-size: 1rem;
-  line-height: 1.7;
-  color: var(--text-primary);
-}
-
-.cursor {
-  display: inline-block;
-  width: 8px;
-  height: 16px;
-  background: var(--accent-color);
-  animation: blink 1s step-end infinite;
-  vertical-align: middle;
-  margin-left: 4px;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-
-.follow-ups-container {
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+.sources-rail {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scroll-snap-type: x proximity;
+  /* Let the rail bleed to the screen edge on mobile without breaking the
+     column's padding. */
+  scrollbar-width: none;
 }
 
-.follow-ups-title {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.sources-rail::-webkit-scrollbar {
+  height: 0;
 }
 
-.follow-up-btn {
+/* --------------------------------------------------------------------------
+   Answer
+   -------------------------------------------------------------------------- */
+.answer {
+  scroll-margin-top: 80px;
+}
+
+/* Caret rides the end of the last block, so it never lands on its own line.
+   Pure CSS — the old version injected `className` into an HTML string, which
+   is not an attribute, so nothing ever rendered. */
+.answer.is-streaming > *:last-child::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: -0.14em;
+  background: var(--cite);
+  animation: caret-blink 1.1s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Working state
+   -------------------------------------------------------------------------- */
+.working {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--paper-dim);
+  font-size: 0.92rem;
+  padding: 6px 0 10px;
+}
+
+.working-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.working-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--cite);
+  animation: dot-pulse 1.3s ease-in-out infinite;
+}
+
+.working-dots i:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.working-dots i:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes dot-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Answer actions
+   -------------------------------------------------------------------------- */
+.answer-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  background: transparent;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-sm);
+  color: var(--paper-dim);
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.ghost-btn:hover {
+  background: var(--ink-800);
+  color: var(--paper);
+  border-color: var(--iris-line);
+}
+
+/* --------------------------------------------------------------------------
+   Follow-ups
+   -------------------------------------------------------------------------- */
+.follow-ups {
+  margin-top: 30px;
+  padding-top: 22px;
+  border-top: 1px solid var(--rule);
+}
+
+.follow-up {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
+  padding: 13px 4px;
+
   background: transparent;
-  border: 1px solid var(--card-border);
-  padding: 12px 16px;
-  border-radius: 8px;
-  color: var(--text-primary);
+  border: none;
+  border-bottom: 1px solid var(--rule);
+  color: var(--paper);
   font-size: 0.95rem;
-  cursor: pointer;
   text-align: left;
-  transition: all 0.2s;
+  cursor: pointer;
+  transition: color 0.18s ease, padding-left 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.follow-up-btn:hover {
-  background: var(--card-bg);
-  border-color: var(--text-secondary);
-  transform: translateX(4px);
+.follow-up:first-of-type {
+  border-top: 1px solid var(--rule);
 }
 
-.follow-up-btn svg {
-  color: var(--accent-color);
+.follow-up svg {
+  color: var(--paper-faint);
+  flex-shrink: 0;
+  transition: color 0.18s ease;
+}
+
+.follow-up:hover {
+  color: var(--iris-bright);
+  padding-left: 10px;
+}
+
+.follow-up:hover svg {
+  color: var(--iris);
+}
+
+/* --------------------------------------------------------------------------
+   Mobile
+   -------------------------------------------------------------------------- */
+@media (max-width: 860px) {
+  .answer-turn {
+    padding-bottom: 30px;
+    margin-bottom: 30px;
+  }
+
+  .question {
+    padding: 4px 0 18px;
+  }
+
+  /* Rail runs edge to edge — it reads as scrollable instead of ending in a
+     hard gutter that looks like the list stops there. */
+  .sources-rail {
+    margin: 0 -16px;
+    padding: 0 16px 6px;
+  }
+
+  .follow-up {
+    padding: 15px 4px;
+  }
+
+  .follow-up:hover {
+    padding-left: 4px;
+  }
 }

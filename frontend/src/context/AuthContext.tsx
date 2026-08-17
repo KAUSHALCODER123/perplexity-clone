@@ -1,9 +1,16 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+
+export interface AuthUser {
+  id: string;
+  email?: string;
+  session?: { access_token?: string };
+  [key: string]: unknown;
+}
 
 interface AuthContextType {
-  user: any;
+  user: AuthUser | null;
   loading: boolean;
-  login: (userData: any) => void;
+  login: (userData: AuthUser) => void;
   logout: () => void;
 }
 
@@ -14,39 +21,54 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
 });
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+/** localStorage is synchronous, so the stored session is known on first render. */
+const readStoredUser = (): AuthUser | null => {
+  const storedUser = localStorage.getItem('user');
+  if (!storedUser) return null;
+  try {
+    const parsed = JSON.parse(storedUser) as AuthUser;
+    // A stored user without a token can't call the API, so treat it as signed
+    // out rather than letting every request 401.
+    if (parsed?.session?.access_token) return parsed;
+  } catch {
+    // falls through to the cleanup below
+  }
+  localStorage.removeItem('user');
+  return null;
+};
 
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<AuthUser | null>(readStoredUser);
+  // Resolved during the first render, so there is no auth flash to wait out.
+  const loading = false;
+
+  // Signing out in one tab signs out the others.
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== 'user') return;
+      if (!e.newValue) {
+        setUser(null);
+        return;
+      }
       try {
-        const parsedUser = JSON.parse(storedUser);
-        // If it's an old session without the token, force a logout
-        if (!parsedUser.session || !parsedUser.session.access_token) {
-          localStorage.removeItem('user');
-          setUser(null);
-        } else {
-          setUser(parsedUser);
-        }
-      } catch (e) {
-        localStorage.removeItem('user');
+        setUser(JSON.parse(e.newValue) as AuthUser);
+      } catch {
         setUser(null);
       }
-    }
-    setLoading(false);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  const login = (userData: any) => {
+  const login = useCallback((userData: AuthUser) => {
     setUser(userData);
     localStorage.setItem('user', JSON.stringify(userData));
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
     localStorage.removeItem('user');
-  };
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout }}>
@@ -55,4 +77,5 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);
