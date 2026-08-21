@@ -47,7 +47,7 @@
   width: 26px;
   height: 26px;
   flex-shrink: 0;
-  font-family: var(--font-read);
+  font-family: var(--font-sans);
   font-size: 1rem;
   line-height: 1;
   color: var(--cite);
@@ -175,7 +175,7 @@
 /* Threads are numbered because the count is real information —
    these are your last N questions, newest first. */
 .conv-index {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 0.66rem;
   font-weight: 500;
   color: var(--paper-faint);

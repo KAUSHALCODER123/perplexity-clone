@@ -35,10 +35,9 @@
   --rule: rgba(236, 233, 226, 0.09);
   --rule-strong: rgba(236, 233, 226, 0.16);
 
-  /* Type */
-  --font-ui: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-read: 'Newsreader', ui-serif, Georgia, serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  /* Type — one family throughout. Weight, size and letter-spacing carry the
+     hierarchy that separate display/body/utility faces used to. */
+  --font-sans: 'Poppins', ui-sans-serif, system-ui, sans-serif;
 
   /* Measure — the answer column never exceeds a comfortable reading width */
   --measure: 46rem;
@@ -68,7 +67,7 @@ body,
 }
 
 body {
-  font-family: var(--font-ui);
+  font-family: var(--font-sans);
   background-color: var(--ink-900);
   color: var(--paper);
   line-height: 1.5;
@@ -242,9 +241,11 @@ textarea {
    Answer prose — this is a document, so it is set like one
    -------------------------------------------------------------------------- */
 .prose {
-  font-family: var(--font-read);
-  font-size: 1.12rem;
-  line-height: 1.7;
+  /* Poppins has a tall x-height and wide set, so it needs a smaller size and
+     more leading than the serif this replaced. */
+  font-size: 1rem;
+  font-weight: 300;
+  line-height: 1.75;
   color: var(--paper);
   overflow-wrap: break-word;
 }
@@ -264,22 +265,22 @@ textarea {
 .prose h2,
 .prose h3,
 .prose h4 {
-  font-family: var(--font-ui);
-  margin: 1.8em 0 0.6em;
-  letter-spacing: -0.02em;
+  margin: 1.9em 0 0.7em;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 .prose h1 {
-  font-size: 1.5rem;
+  font-size: 1.3rem;
 }
 .prose h2 {
-  font-size: 1.25rem;
+  font-size: 1.12rem;
 }
 .prose h3 {
-  font-size: 1.08rem;
+  font-size: 1rem;
 }
 .prose h4 {
-  font-size: 1rem;
+  font-size: 0.94rem;
   color: var(--paper-dim);
 }
 
@@ -298,7 +299,7 @@ textarea {
 }
 
 .prose strong {
-  font-weight: 600;
+  font-weight: 500;
   color: #fbf9f5;
 }
 
@@ -320,7 +321,7 @@ textarea {
 }
 
 .prose code {
-  font-family: var(--font-mono);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 0.85em;
   background: var(--ink-750);
   padding: 0.15em 0.4em;
@@ -344,8 +345,7 @@ textarea {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 1.1em;
-  font-family: var(--font-ui);
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   display: block;
   overflow-x: auto;
 }
@@ -365,43 +365,33 @@ textarea {
 /* --------------------------------------------------------------------------
    The signature: inline citations are live footnotes, in amber, set in mono
    -------------------------------------------------------------------------- */
+/* A printed footnote, not a badge: a bare superscript numeral. The amber and
+   the mono face are enough to mark it as apparatus rather than prose. */
 .citation {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.35em;
-  height: 1.35em;
-  padding: 0 0.32em;
-  /* Left margin only. A right margin pushes the following punctuation away,
-     rendering "suggest [1]." as "suggest 1 ." */
-  margin-left: 0.15em;
-  vertical-align: 0.28em;
+  /* Left padding only. Padding on the right pushes the following punctuation
+     away, rendering "suggest [1]." as "suggest 1 ." */
+  padding-left: 0.12em;
+  vertical-align: super;
 
-  font-family: var(--font-mono);
-  font-size: 0.62em;
+  font-family: var(--font-sans);
+  font-size: 0.6em;
   font-weight: 500;
-  line-height: 1;
 
   color: var(--cite);
-  background: var(--cite-soft);
-  border: 1px solid transparent;
-  border-radius: 5px;
   text-decoration: none;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease,
-    transform 0.15s ease;
+  transition: opacity 0.15s ease;
 }
 
 .citation:hover,
 .citation:focus-visible {
-  background: rgba(232, 163, 61, 0.26);
-  border-color: var(--cite-line);
-  text-decoration: none;
-  transform: translateY(-1px);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  opacity: 0.75;
 }
 
 @media (max-width: 640px) {
   .prose {
-    font-size: 1.06rem;
+    font-size: 0.97rem;
   }
 }

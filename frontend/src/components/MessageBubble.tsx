@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Check, Copy, CornerDownRight } from 'lucide-react';
+import { Check, Copy } from 'lucide-react';
 import { SourceCard } from './SourceCard';
 import { renderAnswer } from '../utils/renderAnswer';
 import './MessageBubble.css';
@@ -66,10 +66,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     <article className="turn answer-turn">
       {sources.length > 0 && (
         <section className="sources" aria-label="Sources">
-          <div className="section-label">
-            Sources
-            <span className="count">{sources.length}</span>
-          </div>
+          <div className="section-label">{sources.length} sources</div>
           <div className="sources-rail">
             {sources.map((source, i) => (
               <SourceCard
@@ -83,9 +80,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </div>
         </section>
       )}
-
-      {/* A one-line reply to "hi" doesn't need a section heading over it. */}
-      {message.mode !== 'direct' && <div className="section-label">Answer</div>}
 
       {!hasText && message.isStreaming ? (
         <p className="working" role="status">
@@ -109,24 +103,26 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
       {hasText && !message.isStreaming && (
         <div className="answer-actions">
-          <button className="ghost-btn" onClick={copyAnswer}>
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-            {copied ? 'Copied' : 'Copy'}
+          <button
+            className="ghost-btn"
+            onClick={copyAnswer}
+            aria-label={copied ? 'Copied' : 'Copy answer'}
+            title={copied ? 'Copied' : 'Copy answer'}
+          >
+            {copied ? <Check size={15} /> : <Copy size={15} />}
           </button>
         </div>
       )}
 
       {message.followUps && message.followUps.length > 0 && !message.isStreaming && (
         <section className="follow-ups">
-          <div className="section-label">Keep going</div>
           {message.followUps.map((question, i) => (
             <button
               key={i}
               className="follow-up"
               onClick={() => onFollowUpClick?.(question)}
             >
-              <CornerDownRight size={15} />
-              <span>{question}</span>
+              {question}
             </button>
           ))}
         </section>

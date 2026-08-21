@@ -4,13 +4,13 @@
   gap: 8px;
   justify-content: space-between;
 
-  width: 178px;
-  min-height: 92px;
+  width: 170px;
+  min-height: 82px;
   flex-shrink: 0;
-  padding: 11px 12px;
+  padding: 10px 12px;
 
   background-color: var(--ink-850);
-  border: 1px solid var(--rule);
+  border: none;
   border-radius: var(--radius);
   text-decoration: none;
   scroll-snap-align: start;
@@ -22,15 +22,13 @@
 
 .source-card:hover {
   background-color: var(--ink-800);
-  border-color: var(--cite-line);
   text-decoration: none;
-  transform: translateY(-2px);
 }
 
-/* A citation link lands here — flash the card so the eye finds it. */
+/* A citation link lands here — mark the card so the eye finds it. */
 .source-card:target {
-  border-color: var(--cite);
-  background-color: rgba(232, 163, 61, 0.07);
+  background-color: rgba(232, 163, 61, 0.09);
+  box-shadow: inset 2px 0 0 var(--cite);
 }
 
 .source-head {
@@ -43,25 +41,15 @@
 /* The index is the whole point of the card: it is what [1] in the prose
    refers to, so it is set in the same mono amber as the citation chip. */
 .source-index {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
   flex-shrink: 0;
-
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   font-weight: 500;
   line-height: 1;
   color: var(--cite);
-  background: var(--cite-soft);
-  border-radius: 5px;
 }
 
 .source-domain {
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
+  font-size: 0.7rem;
   color: var(--paper-faint);
   white-space: nowrap;
   overflow: hidden;
@@ -87,7 +75,7 @@
 
 @media (max-width: 860px) {
   .source-card {
-    width: 158px;
-    min-height: 86px;
+    width: 152px;
+    min-height: 78px;
   }
 }

@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Plus, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import {
+  Plus,
+  LogOut,
+  MessageSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { fetchAPI } from '../utils/api';
@@ -102,14 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate, drawerOpen, childr
       aria-label="Threads"
     >
       <div className="sidebar-header">
-        {!collapsed && (
-          <div className="brand">
-            <span className="brand-mark" aria-hidden="true">
-              §
-            </span>
-            <span className="brand-name">Cited</span>
-          </div>
-        )}
+        {!collapsed && <span className="brand-name">Cited</span>}
         <button
           className="icon-btn collapse-btn"
           onClick={toggleCollapsed}
@@ -140,17 +139,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate, drawerOpen, childr
           </p>
         )}
 
-        {conversations.map((conv, i) => (
+        {conversations.map((conv) => (
           <button
             key={conv.id}
             className={`conversation-item ${activeId === conv.id ? 'active' : ''}`}
             onClick={() => openThread(conv.id)}
             title={conv.title || 'Untitled thread'}
           >
-            <span className="conv-index" aria-hidden="true">
-              {String(conversations.length - i).padStart(2, '0')}
-            </span>
-            {!collapsed && (
+            {collapsed ? (
+              <MessageSquare size={16} aria-hidden="true" />
+            ) : (
               <span className="conv-title">{conv.title || 'Untitled thread'}</span>
             )}
           </button>

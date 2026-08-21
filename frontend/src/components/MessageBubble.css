@@ -20,46 +20,22 @@
    The question
    -------------------------------------------------------------------------- */
 .question {
-  font-family: var(--font-read);
-  font-size: clamp(1.45rem, 3.6vw, 1.95rem);
+  font-size: clamp(1.2rem, 3vw, 1.45rem);
   font-weight: 400;
-  line-height: 1.28;
-  letter-spacing: -0.02em;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
   color: var(--paper);
   padding: 8px 0 22px;
   overflow-wrap: break-word;
 }
 
-/* --------------------------------------------------------------------------
-   Section labels — the same mono voice used for citations and domains,
-   because they all belong to the apparatus rather than the prose
-   -------------------------------------------------------------------------- */
+/* One quiet label for the source rail. The answer needs no heading — it is
+   plainly the answer — and the follow-ups explain themselves. */
 .section-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  font-weight: 500;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 400;
   color: var(--paper-faint);
-  margin-bottom: 12px;
-}
-
-.section-label .count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  font-size: 0.62rem;
-  letter-spacing: 0;
-  color: var(--cite);
-  background: var(--cite-soft);
-  border-radius: 5px;
+  margin-bottom: 10px;
 }
 
 /* --------------------------------------------------------------------------
@@ -172,69 +148,51 @@
 .ghost-btn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
 
   background: transparent;
-  border: 1px solid var(--rule-strong);
+  border: none;
   border-radius: var(--radius-sm);
-  color: var(--paper-dim);
-  padding: 7px 12px;
-  font-size: 0.8rem;
+  color: var(--paper-faint);
   cursor: pointer;
-  transition: background-color 0.18s ease, color 0.18s ease,
-    border-color 0.18s ease;
+  transition: background-color 0.18s ease, color 0.18s ease;
 }
 
 .ghost-btn:hover {
   background: var(--ink-800);
   color: var(--paper);
-  border-color: var(--iris-line);
 }
 
 /* --------------------------------------------------------------------------
    Follow-ups
    -------------------------------------------------------------------------- */
 .follow-ups {
-  margin-top: 30px;
-  padding-top: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-top: 26px;
+  padding-top: 18px;
   border-top: 1px solid var(--rule);
 }
 
 .follow-up {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 13px 4px;
-
+  padding: 7px 0;
   background: transparent;
   border: none;
-  border-bottom: 1px solid var(--rule);
-  color: var(--paper);
-  font-size: 0.95rem;
+  color: var(--paper-faint);
+  font-size: 0.88rem;
+  font-weight: 300;
   text-align: left;
   cursor: pointer;
-  transition: color 0.18s ease, padding-left 0.18s ease;
+  transition: color 0.18s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
-.follow-up:first-of-type {
-  border-top: 1px solid var(--rule);
-}
-
-.follow-up svg {
-  color: var(--paper-faint);
-  flex-shrink: 0;
-  transition: color 0.18s ease;
-}
-
 .follow-up:hover {
-  color: var(--iris-bright);
-  padding-left: 10px;
-}
-
-.follow-up:hover svg {
-  color: var(--iris);
+  color: var(--paper);
 }
 
 /* --------------------------------------------------------------------------
@@ -258,10 +216,6 @@
   }
 
   .follow-up {
-    padding: 15px 4px;
-  }
-
-  .follow-up:hover {
-    padding-left: 4px;
+    padding: 9px 0;
   }
 }

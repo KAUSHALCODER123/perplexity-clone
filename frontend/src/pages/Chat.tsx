@@ -292,16 +292,7 @@ export const Chat: React.FC = () => {
       <div className="chat-container">
         <div className="ask-screen animate-rise">
           <div className="ask-inner">
-            <p className="ask-eyebrow">Answers with receipts</p>
-            <h1 className="ask-title">
-              Ask anything.
-              <br />
-              <em>Check everything.</em>
-            </h1>
-            <p className="ask-sub">
-              Every claim in the answer carries a numbered footnote back to the page
-              it came from.
-            </p>
+            <h1 className="ask-title">Ask anything.</h1>
 
             {error && <div className="notice error">{error}</div>}
 

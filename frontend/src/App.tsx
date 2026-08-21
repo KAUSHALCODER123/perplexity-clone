@@ -14,7 +14,7 @@ const Splash: React.FC = () => (
       justifyContent: 'center',
       alignItems: 'center',
       color: 'var(--paper-faint)',
-      fontFamily: 'var(--font-mono)',
+      fontFamily: 'var(--font-sans)',
       fontSize: '0.75rem',
       letterSpacing: '0.14em',
       textTransform: 'uppercase',
