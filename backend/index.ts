@@ -3,24 +3,30 @@ import express from "express"
 import cors from "cors";
 import z from "zod";
 import { tavily } from '@tavily/core';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 import { supabase } from "./supabaseClient.ts";
 import { PromptTemplate, SYSTEM_PROMPT, CHAT_SYSTEM_PROMPT, CHAT_TEMPLATE } from "./prompt.ts";
 import { authMiddleware } from "./middleware.ts";
 
 const client = tavily({ apiKey: process.env.TAVILY_API_KEY! });
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    systemInstruction: SYSTEM_PROMPT
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
-// The search prompt requires a citation on every claim, which is impossible
-// when there are no sources. Conversational turns use their own instructions.
-const chatModel = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    systemInstruction: CHAT_SYSTEM_PROMPT
-});
+/**
+ * Answers stream token by token, so time-to-first-token is what the user feels.
+ * gpt-4.1-mini is the fastest model that still holds the citation format
+ * reliably; set OPENAI_MODEL=gpt-4.1-nano to trade some of that for more speed.
+ */
+const ANSWER_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+/** Follow-ups are three short questions — the smallest model is plenty. */
+const FOLLOW_UP_MODEL = process.env.OPENAI_FOLLOW_UP_MODEL || "gpt-4.1-nano";
+
+/**
+ * The search prompt requires a citation on every claim, which is impossible
+ * when there are no sources. Conversational turns use their own instructions.
+ */
+function systemPromptFor(route: Route): string {
+    return route === 'search' ? SYSTEM_PROMPT : CHAT_SYSTEM_PROMPT;
+}
 
 interface MockConversation {
     id: string;
@@ -51,15 +57,28 @@ const mockMessages: MockMessage[] = [];
 async function generateFollowUps(query: string, answer: string): Promise<string[]> {
     if (!answer.trim()) return [];
     try {
-        // chatModel, not model: the search system prompt would try to add
-        // citations to what has to come back as a bare JSON array.
-        const result = await chatModel.generateContent(
-            `A user asked: "${query}"\n\nThey received this answer:\n${answer.slice(0, 4000)}\n\n` +
-            `Write 3 short follow-up questions they would plausibly ask next. ` +
-            `Each must be a standalone question under 12 words. ` +
-            `Return ONLY a JSON array of 3 strings, no markdown fence, no commentary.`
-        );
-        const raw = result.response.text().trim().replace(/^```(?:json)?|```$/g, '').trim();
+        // CHAT_SYSTEM_PROMPT, not SYSTEM_PROMPT: the search instructions would
+        // try to add citations to what has to come back as a bare JSON array.
+        const completion = await openai.chat.completions.create({
+            model: FOLLOW_UP_MODEL,
+            messages: [
+                { role: "system", content: CHAT_SYSTEM_PROMPT },
+                {
+                    role: "user",
+                    content:
+                        `A user asked: "${query}"
+
+They received this answer:
+${answer.slice(0, 4000)}
+
+` +
+                        `Write 3 short follow-up questions they would plausibly ask next. ` +
+                        `Each must be a standalone question under 12 words. ` +
+                        `Return ONLY a JSON array of 3 strings, no markdown fence, no commentary.`
+                }
+            ]
+        });
+        const raw = (completion.choices[0]?.message?.content || '').trim().replace(/^```(?:json)?|```$/g, '').trim();
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) return [];
         return parsed
@@ -250,7 +269,6 @@ async function handleAsk(req: any, res: any, opts: { withHistory: boolean }) {
 
         let sources: { title: string; url: string }[] = [];
         let promptText: string;
-        let activeModel = model;
 
         if (route === 'search') {
             const webSearchResponse = await client.search(query, { searchDepth: "advanced" });
@@ -270,14 +288,21 @@ async function handleAsk(req: any, res: any, opts: { withHistory: boolean }) {
             promptText = CHAT_TEMPLATE
                 .replace("{{CONVERSATION_HISTORY}}", historyStr)
                 .replace("{{USER_QUERY}}", query);
-            activeModel = chatModel;
         }
 
-        const resultStream = await activeModel.generateContentStream(promptText);
+        const resultStream = await openai.chat.completions.create({
+            model: ANSWER_MODEL,
+            stream: true,
+            messages: [
+                { role: "system", content: systemPromptFor(route) },
+                { role: "user", content: promptText }
+            ]
+        });
 
         let aiFullContent = '';
-        for await (const chunk of resultStream.stream) {
-            const chunkText = chunk.text();
+        for await (const chunk of resultStream) {
+            const chunkText = chunk.choices[0]?.delta?.content || '';
+            if (!chunkText) continue;
             aiFullContent += chunkText;
             sendSSE('text', { delta: chunkText });
         }

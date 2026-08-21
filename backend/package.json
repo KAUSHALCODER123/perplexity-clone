@@ -11,9 +11,7 @@
   "author": "",
   "license": "ISC",
   "type": "module",
-  "devDependencies": {},
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.104.1",
     "@tavily/core": "^0.7.2",
     "@types/cors": "^2.8.19",
@@ -21,6 +19,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "openai": "^7.5.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "zod": "^4.3.6"
